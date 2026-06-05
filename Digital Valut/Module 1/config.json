@@ -1,0 +1,21 @@
+{
+  "module_name": "Module 1",
+  "video": "Lesson.mp4",
+  "timeline": [
+    {
+      "start": 0,
+      "end": 31,
+      "state": "focus"
+    },
+    {
+      "start": 31,
+      "end": 62,
+      "state": "creative"
+    },
+    {
+      "start": 62,
+      "end": 93,
+      "state": "calm"
+    }
+  ]
+}
