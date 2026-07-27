@@ -1,4 +1,0 @@
-customtkinter>=5.2.0
-pygame-ce>=2.4.0
-python-vlc>=3.0.18121
-requests>=2.31.0
