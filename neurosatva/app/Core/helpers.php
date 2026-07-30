@@ -74,16 +74,3 @@ function tutor_user_id(int|string $id): string
 {
     return 'NS-TUT-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
 }
-
-function json_response(array $payload, int $status = 200): never
-{
-    http_response_code($status);
-    header('Content-Type: application/json');
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-function storage_public_url(?string $path): ?string
-{
-    return $path ? path('/' . ltrim($path, '/')) : null;
-}

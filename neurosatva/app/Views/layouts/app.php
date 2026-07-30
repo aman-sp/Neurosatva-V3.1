@@ -4,9 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title ?? 'Dashboard') ?> | <?= e(app_config('name')) ?></title>
-    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css')) ?>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/css/app.css'))) ?>">
 </head>
-<body class="dashboard-body" data-base-path="<?= e(rtrim(parse_url(app_config('url'), PHP_URL_PATH) ?: '', '/')) ?>">
+<body class="dashboard-body">
     <div class="app-shell">
         <?php require dirname(__DIR__) . '/partials/sidebar.php'; ?>
         <div class="main-panel">
@@ -27,6 +30,6 @@
             </main>
         </div>
     </div>
-    <script src="<?= e(path('/assets/js/app.js')) ?>"></script>
+    <script src="<?= e(path('/assets/js/app.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js'))) ?>"></script>
 </body>
 </html>

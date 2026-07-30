@@ -204,277 +204,587 @@ document.querySelectorAll('[data-open-pasted-link]').forEach((button) => {
   });
 });
 
-document.querySelectorAll('[data-confirm-delete]').forEach((form) => {
-  form.addEventListener('submit', (event) => {
-    const assigned = form.querySelector('[name="confirm_assigned_delete"]');
-    const message = assigned
-      ? 'This module is assigned to tutors. Delete module, files, metadata, and assignments?'
-      : 'Delete this module and all files?';
-    if (!confirm(message)) event.preventDefault();
-  });
-});
+/* ===== SCENE BUILDER ===== */
 
-document.querySelectorAll('[data-module-builder]').forEach((builder) => {
-  const sceneList = builder.querySelector('[data-scene-list]');
-  const audioInput = builder.querySelector('[data-audio-upload]');
-  const pendingAudioList = builder.querySelector('[data-pending-audio-list]');
+function createSceneRow(index, data = {}) {
+  const duration = data.duration !== undefined ? data.duration : 60;
+  const state = data.state || 'focus';
+  const audio = data.audio || '';
+  const audioVolume = data.audio_volume !== undefined ? data.audio_volume : 1.0;
+  const frequency = data.frequency || '';
+  const modulation = data.modulation || 'None';
+  const brightness = data.brightness !== undefined ? data.brightness : 50;
+  const cct = data.cct !== undefined ? data.cct : 50;
 
-  const audioNames = () => {
-    const existing = [...builder.querySelectorAll('[data-audio-name]')].map((row) => row.dataset.audioName);
-    const uploads = audioInput?.files ? [...audioInput.files].map((file) => file.name) : [];
-    return [...new Set([...existing, ...uploads].filter(Boolean))];
+  let r = 0, g = 0, b = 0;
+  if (Array.isArray(data.rgb)) {
+    r = data.rgb[0] ?? 0;
+    g = data.rgb[1] ?? 0;
+    b = data.rgb[2] ?? 0;
+  } else {
+    r = data.rgb_r ?? data.r ?? 0;
+    g = data.rgb_g ?? data.g ?? 0;
+    b = data.rgb_b ?? data.b ?? 0;
+  }
+
+  let audioOptions = '<option value="">-- None --</option>';
+  const existingAudioSelect = document.querySelector('.scene-audio-select');
+  if (existingAudioSelect) {
+    Array.from(existingAudioSelect.options).forEach(opt => {
+      if (!opt.value) return;
+      const sel = opt.value === audio ? 'selected' : '';
+      audioOptions += `<option value="${opt.value}" ${sel}>${opt.text}</option>`;
+    });
+  }
+  if (audio && !audioOptions.includes(`value="${audio}"`)) {
+    audioOptions += `<option value="${audio}" selected>${audio}</option>`;
+  }
+
+  return `
+  <div class="scene-row" data-index="${index}">
+    <div class="scene-header">
+      <span class="drag-handle" style="cursor: grab; opacity: .5;">⠿</span>
+      <span class="scene-number">${index + 1}</span>
+      <span class="scene-summary">Scene ${index + 1} — ${duration}s — ${state}</span>
+      <button type="button" class="button ghost small duplicate-scene">Copy</button>
+      <button type="button" class="button danger small delete-scene">Delete</button>
+    </div>
+    <div class="scene-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 18px; border-top: 1px solid rgba(255,255,255,.1);">
+      <div class="stack" style="gap: 6px;">
+        <label>Duration (seconds)</label>
+        <input type="number" name="scenes[${index}][duration]" min="1" value="${duration}" class="scene-duration">
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>State Name</label>
+        <input type="text" name="scenes[${index}][state]" value="${state}" class="scene-state" placeholder="e.g. focus, rest">
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>Audio File</label>
+        <select name="scenes[${index}][audio]" class="scene-audio-select" data-selected="${audio}">
+          ${audioOptions}
+        </select>
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>Audio Volume (<span class="vol-val">${audioVolume}</span>)</label>
+        <input type="range" name="scenes[${index}][audio_volume]" min="0" max="1" step="0.01" value="${audioVolume}" oninput="this.previousElementSibling.querySelector('.vol-val').textContent = this.value">
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>Frequency</label>
+        <input type="text" name="scenes[${index}][frequency]" value="${frequency}" placeholder="e.g. 6 Hz">
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>Audio Modulation</label>
+        <select name="scenes[${index}][modulation]">
+          <option value="None" ${['None', ''].includes(modulation) ? 'selected' : ''}>None</option>
+          <option value="Amplitude Modulation (AM)" ${['Amplitude Modulation (AM)', 'AM'].includes(modulation) ? 'selected' : ''}>Amplitude Modulation (AM)</option>
+          <option value="Isochronic Pulse" ${['Isochronic Pulse', 'Isochronic'].includes(modulation) ? 'selected' : ''}>Isochronic Pulse</option>
+          <option value="Monaural Beat" ${['Monaural Beat', 'Monaural'].includes(modulation) ? 'selected' : ''}>Monaural Beat</option>
+          <option value="Binaural Beat" ${['Binaural Beat', 'Binaural'].includes(modulation) ? 'selected' : ''}>Binaural Beat</option>
+          <option value="Tremolo / Slow AM" ${['Tremolo / Slow AM', 'Tremolo'].includes(modulation) ? 'selected' : ''}>Tremolo / Slow AM</option>
+        </select>
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>Brightness (0–100)</label>
+        <input type="range" name="scenes[${index}][brightness]" min="0" max="100" value="${brightness}">
+      </div>
+      <div class="stack" style="gap: 6px;">
+        <label>CCT (0–100)</label>
+        <input type="range" name="scenes[${index}][cct]" min="0" max="100" value="${cct}">
+      </div>
+      <div class="stack" style="gap: 6px; grid-column: span 2;">
+        <label>RGB Color [r, g, b]</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="number" name="scenes[${index}][rgb_r]" min="0" max="255" value="${r}" placeholder="R" style="width: 80px;" class="rgb-r">
+          <input type="number" name="scenes[${index}][rgb_g]" min="0" max="255" value="${g}" placeholder="G" style="width: 80px;" class="rgb-g">
+          <input type="number" name="scenes[${index}][rgb_b]" min="0" max="255" value="${b}" placeholder="B" style="width: 80px;" class="rgb-b">
+          <div class="color-swatch" style="width: 36px; height: 36px; border-radius: 8px; background: rgb(${r},${g},${b}); border: 1px solid rgba(255,255,255,.2); flex-shrink: 0;"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initSceneBuilder() {
+  const addBtn = document.getElementById('add-scene-btn');
+  const list = document.getElementById('scene-list');
+  if (!list) return;
+
+  const updateIndices = () => {
+    const rows = list.querySelectorAll('.scene-row');
+    rows.forEach((row, i) => {
+      row.dataset.index = i;
+      const num = row.querySelector('.scene-number');
+      if (num) num.textContent = i + 1;
+
+      const r = row.querySelector('.rgb-r')?.value || 0;
+      const g = row.querySelector('.rgb-g')?.value || 0;
+      const b = row.querySelector('.rgb-b')?.value || 0;
+      const d = row.querySelector('.scene-duration')?.value || '60';
+      const st = row.querySelector('.scene-state')?.value || 'focus';
+
+      const sum = row.querySelector('.scene-summary');
+      if (sum) sum.textContent = `Scene ${i + 1} — ${d}s — ${st}`;
+
+      const swatch = row.querySelector('.color-swatch');
+      if (swatch) swatch.style.backgroundColor = `rgb(${r},${g},${b})`;
+    });
   };
 
-  const refreshAudioSelects = () => {
-    const names = audioNames();
-    if (pendingAudioList) {
-      pendingAudioList.innerHTML = '';
-      if (audioInput?.files?.length) {
-        [...audioInput.files].forEach((file) => {
-          const row = document.createElement('div');
-          row.className = 'audio-row pending';
-          row.innerHTML = `<strong>${file.name}</strong><span class="hint">Ready to save</span><span></span><span></span>`;
-          pendingAudioList.appendChild(row);
-        });
+  window.updateSceneIndices = updateIndices;
+
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const idx = list.children.length;
+      list.insertAdjacentHTML('beforeend', createSceneRow(idx));
+      updateIndices();
+    });
+  }
+
+  list.addEventListener('click', (e) => {
+    const header = e.target.closest('.scene-header');
+    if (header && !e.target.closest('button, .drag-handle')) {
+      const body = header.nextElementSibling;
+      if (body) {
+        body.style.display = (body.style.display === 'none') ? 'grid' : 'none';
       }
     }
-    builder.querySelectorAll('[data-scene-audio]').forEach((select) => {
-      const selected = select.value;
-      select.innerHTML = '';
-      names.forEach((name) => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        option.selected = selected === name;
-        select.appendChild(option);
-      });
-    });
-  };
 
-  const wireScene = (scene) => {
-    scene.querySelector('[data-delete-scene]')?.addEventListener('click', () => {
-      if (sceneList.children.length > 1) scene.remove();
-    });
-    scene.querySelector('[data-duplicate-scene]')?.addEventListener('click', () => {
-      const clone = scene.cloneNode(true);
-      scene.after(clone);
-      wireScene(clone);
-      refreshAudioSelects();
-    });
-    scene.querySelectorAll('[data-move-scene]').forEach((button) => {
-      button.addEventListener('click', () => {
-        if (button.dataset.moveScene === 'up' && scene.previousElementSibling) scene.before(scene.previousElementSibling);
-        if (button.dataset.moveScene === 'down' && scene.nextElementSibling) scene.after(scene.nextElementSibling);
-      });
-    });
-  };
-
-  audioInput?.addEventListener('change', refreshAudioSelects);
-  builder.querySelector('[data-add-scene]')?.addEventListener('click', () => {
-    const first = sceneList.querySelector('[data-scene]');
-    if (!first) return;
-    const clone = first.cloneNode(true);
-    clone.querySelectorAll('input').forEach((input) => {
-      if (!['scene_duration[]', 'scene_audio_volume[]', 'scene_brightness[]', 'scene_cct[]', 'scene_rgb_r[]', 'scene_rgb_g[]', 'scene_rgb_b[]'].includes(input.name)) {
-        input.value = '';
+    const delBtn = e.target.closest('.delete-scene, [data-delete-scene]');
+    if (delBtn) {
+      e.stopPropagation();
+      const row = delBtn.closest('.scene-row');
+      if (row) {
+        row.remove();
+        updateIndices();
       }
-    });
-    sceneList.appendChild(clone);
-    wireScene(clone);
-    refreshAudioSelects();
+    }
+
+    const dupBtn = e.target.closest('.duplicate-scene, [data-dup-scene]');
+    if (dupBtn) {
+      e.stopPropagation();
+      const row = dupBtn.closest('.scene-row');
+      if (row) {
+        const clone = row.cloneNode(true);
+        row.after(clone);
+        updateIndices();
+      }
+    }
   });
-  sceneList.querySelectorAll('[data-scene]').forEach(wireScene);
-  refreshAudioSelects();
-});
 
-class ModuleLoader {
-  constructor(payload) { this.payload = payload; }
-  videoUrl() { return this.payload.video_url; }
-  timeline() { return this.payload.config.timeline || []; }
-  audioUrls() { return this.payload.audio_urls || {}; }
-}
-
-class TimelineEngine {
-  constructor(timeline) {
-    this.timeline = timeline;
-    this.boundaries = [];
-    let cursor = 0;
-    timeline.forEach((scene, index) => {
-      const start = cursor;
-      cursor += Number(scene.duration || 0);
-      this.boundaries.push({ index, start, end: cursor, scene });
-    });
-  }
-  sceneAt(seconds) {
-    return this.boundaries.find((entry) => seconds >= entry.start && seconds < entry.end) || this.boundaries.at(-1) || null;
-  }
-}
-
-class VideoEngine {
-  constructor(video, url) { this.video = video; this.video.src = url; }
-  play() { return this.video.play(); }
-  pause() { this.video.pause(); }
-  time() { return this.video.currentTime || 0; }
-  on(event, handler) { this.video.addEventListener(event, handler); }
-}
-
-class AudioEngine {
-  constructor(urls) {
-    this.tracks = {};
-    Object.entries(urls).forEach(([name, url]) => {
-      const audio = new Audio(url);
-      audio.loop = true;
-      this.tracks[name] = audio;
-    });
-    this.current = null;
-  }
-  async switchTo(name, volume) {
-    if (this.current === name) {
-      if (this.tracks[name]) this.tracks[name].volume = volume;
-      return;
+  list.addEventListener('input', (e) => {
+    if (e.target.matches('.rgb-r, .rgb-g, .rgb-b, .scene-duration, .scene-state')) {
+      updateIndices();
     }
-    Object.values(this.tracks).forEach((track) => track.pause());
-    this.current = name;
-    const track = this.tracks[name];
-    if (!track) return;
-    track.currentTime = 0;
-    track.volume = volume;
-    await track.play();
-  }
-  stop() { Object.values(this.tracks).forEach((track) => { track.pause(); track.currentTime = 0; }); }
-}
+  });
 
-class WledClient {
-  constructor(ip) { this.ip = ip; this.connected = false; }
-  async probe() {
-    const basePath = document.body.dataset.basePath || '';
-    const response = await fetch(`${basePath}/api/modules/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ esp32_ip: this.ip })
-    });
-    const data = await response.json();
-    this.connected = !!data.ok;
-    if (!data.ok) throw new Error(data.message || 'WLED validation failed.');
-    return data;
-  }
-  send(scene) {
-    const [r, g, b] = scene.rgb || [0, 0, 0];
-    const payload = { on: true, bri: Number(scene.brightness || 0), seg: [{ col: [[r, g, b]], cct: Number(scene.cct || 0) }] };
-    return fetch(`http://${this.ip}/json/state`, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(() => {});
-  }
-}
-
-class LightingEngine {
-  constructor(client) { this.client = client; this.lastKey = ''; }
-  apply(scene) {
-    const key = JSON.stringify([scene.brightness, scene.cct, scene.rgb]);
-    if (key === this.lastKey) return;
-    this.lastKey = key;
-    this.client.send(scene);
-  }
-}
-
-class RuntimeController {
-  constructor(root) {
-    this.root = root;
-    this.payload = JSON.parse(root.dataset.module || '{}');
-    this.loader = new ModuleLoader(this.payload);
-    this.video = new VideoEngine(root.querySelector('[data-runtime-video]') || root.querySelector('video'), this.loader.videoUrl());
-    this.timeline = new TimelineEngine(this.loader.timeline());
-    this.audio = new AudioEngine(this.loader.audioUrls());
-    this.status = root.querySelector('[data-runtime-status]');
-    this.sceneIndex = -1;
-    this.sessionId = null;
-    this.startedAt = null;
-  }
-  async start() {
-    const ip = this.root.dataset.deviceIp || this.root.querySelector('[data-runtime-ip]')?.value.trim();
-    if (!/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(ip || '')) {
-      this.render('Enter a valid IPv4 address.');
-      return;
+  let draggedRow = null;
+  list.addEventListener('dragstart', (e) => {
+    if (e.target.matches('.scene-row')) {
+      draggedRow = e.target;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => e.target.style.opacity = '0.5', 0);
     }
-    this.wled = new WledClient(ip);
+  });
+
+  list.addEventListener('dragend', (e) => {
+    if (e.target.matches('.scene-row')) {
+      e.target.style.opacity = '1';
+      draggedRow = null;
+      updateIndices();
+    }
+  });
+
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!draggedRow) return;
+    const afterElement = getDragAfterElement(list, e.clientY);
+    if (afterElement == null) {
+      list.appendChild(draggedRow);
+    } else {
+      list.insertBefore(draggedRow, afterElement);
+    }
+  });
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.scene-row:not([style*="opacity: 0.5"])')];
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+}
+
+/* ===== UNIVERSAL DROPZONE ENGINE (with type validation) ===== */
+
+/**
+ * Returns the lowercase extension of a filename, e.g. "mp4", "json".
+ */
+function getFileExt(filename) {
+  return filename.split('.').pop().toLowerCase();
+}
+
+/**
+ * Reads the allowed extensions for a dropzone element.
+ * Falls back to reading the input's accept attribute if no data-allowed-exts is set.
+ * Returns an array of lowercase extension strings, e.g. ["mp4", "mov"].
+ */
+function getAllowedExts(zone, input) {
+  if (zone.dataset.allowedExts) {
+    return zone.dataset.allowedExts.split(',').map(e => e.trim().toLowerCase());
+  }
+  // Fallback: parse the accept attribute
+  const accept = input.accept || '';
+  return accept.split(',').map(s => s.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
+}
+
+/**
+ * Shows an inline error message inside (or just below) the dropzone.
+ * Auto-dismisses after 4 s.
+ */
+function showDropzoneError(zone, message) {
+  // Reuse an existing error el if already present
+  let errEl = zone.parentElement.querySelector('.dropzone-error-msg');
+  if (!errEl) {
+    errEl = document.createElement('p');
+    errEl.className = 'dropzone-error-msg';
+    errEl.style.cssText = [
+      'margin: 6px 0 0',
+      'padding: 7px 12px',
+      'background: rgba(239,68,68,.18)',
+      'border: 1px solid rgba(239,68,68,.45)',
+      'border-radius: 8px',
+      'color: #fca5a5',
+      'font-size: 12px',
+      'font-weight: 500',
+      'animation: fadeInDown .18s ease',
+    ].join(';');
+    zone.insertAdjacentElement('afterend', errEl);
+  }
+  errEl.textContent = '⚠ ' + message;
+  clearTimeout(errEl._timer);
+  errEl._timer = setTimeout(() => errEl.remove(), 4000);
+}
+
+/**
+ * Removes any error message for the dropzone.
+ */
+function clearDropzoneError(zone) {
+  const errEl = zone.parentElement?.querySelector('.dropzone-error-msg');
+  if (errEl) errEl.remove();
+}
+
+/**
+ * Validates an array of File objects against allowed extensions.
+ * Returns { valid: File[], rejected: string[] }
+ */
+function partitionFiles(files, allowedExts) {
+  const valid = [];
+  const rejected = [];
+  for (const f of files) {
+    if (allowedExts.includes(getFileExt(f.name))) {
+      valid.push(f);
+    } else {
+      rejected.push(f.name);
+    }
+  }
+  return { valid, rejected };
+}
+
+function initAllDropZones() {
+  document.querySelectorAll('.drop-zone').forEach((zone) => {
+    const input = zone.querySelector('input[type="file"]');
+    if (!input) return;
+    bindDropZoneEvents(zone, input);
+  });
+}
+
+function bindDropZoneEvents(zone, input) {
+  if (zone.dataset.dropzoneBound === '1') return;
+  zone.dataset.dropzoneBound = '1';
+
+  zone.style.cursor = 'pointer';
+
+  zone.addEventListener('click', (e) => {
+    if (e.target.closest('button, a')) return;
+    if (e.target === input) return;
+    input.click();
+  });
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    zone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.add('dragging');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    zone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.remove('dragging');
+    }, false);
+  });
+
+  zone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    if (!dt || !dt.files || !dt.files.length) return;
+
+    const allowedExts = getAllowedExts(zone, input);
+    const { valid, rejected } = partitionFiles(Array.from(dt.files), allowedExts);
+
+    if (rejected.length) {
+      const label = zone.dataset.allowedLabel || allowedExts.map(x => '.' + x).join(', ');
+      showDropzoneError(zone,
+        `Wrong file type${rejected.length > 1 ? 's' : ''}: ${rejected.join(', ')}. Allowed: ${label}`);
+    }
+
+    if (!valid.length) return;
+
+    // Assign only valid files to the input
     try {
-      if (this.root.dataset.mode === 'test') await this.wled.probe();
-      if (this.root.dataset.mode === 'tutor') await this.startSession();
-      this.lighting = new LightingEngine(this.wled);
-      this.startedAt = Date.now();
-      this.bind();
-      await this.video.play();
-    } catch (error) {
-      this.render(error.message);
+      const container = new DataTransfer();
+      valid.forEach(f => container.items.add(f));
+      input.files = container.files;
+    } catch (_) {
+      // DataTransfer not supported — fall back (browser will re-validate on submit)
+    }
+
+    if (rejected.length === 0) clearDropzoneError(zone);
+    handleFileSelection(zone, input);
+  });
+
+  input.addEventListener('change', () => {
+    if (!input.files || !input.files.length) return;
+
+    const allowedExts = getAllowedExts(zone, input);
+    const { valid, rejected } = partitionFiles(Array.from(input.files), allowedExts);
+
+    if (rejected.length) {
+      const label = zone.dataset.allowedLabel || allowedExts.map(x => '.' + x).join(', ');
+      showDropzoneError(zone,
+        `Wrong file type${rejected.length > 1 ? 's' : ''}: ${rejected.join(', ')}. Allowed: ${label}`);
+
+      if (!valid.length) {
+        // All files invalid — clear the input and abort
+        input.value = '';
+        return;
+      }
+
+      // Some valid files remain — keep only those
+      try {
+        const container = new DataTransfer();
+        valid.forEach(f => container.items.add(f));
+        input.files = container.files;
+      } catch (_) { /* ignore */ }
+    } else {
+      clearDropzoneError(zone);
+    }
+
+    handleFileSelection(zone, input);
+  });
+}
+
+function handleFileSelection(zone, input) {
+  if (!input.files || !input.files.length) return;
+
+  const textEl = zone.querySelector('.drop-text') || zone.querySelector('.drop-zone-text') || zone.querySelector('span');
+  if (textEl) {
+    if (input.files.length === 1) {
+      textEl.textContent = '✓ Selected: ' + input.files[0].name;
+    } else {
+      textEl.textContent = `✓ ${input.files.length} files selected`;
     }
   }
-  bind() {
-    if (this.bound) return;
-    this.bound = true;
-    this.video.on('timeupdate', () => this.tick());
-    this.video.on('seeked', () => { this.sceneIndex = -1; this.tick(); });
-    this.video.on('ended', () => this.end(true));
-    this.video.on('pause', () => this.audio.stop());
+  zone.classList.add('has-file');
+
+  // Thumbnail preview
+  if (input.id === 'thumb-input') {
+    const previewContainer = document.getElementById('thumb-preview');
+    if (previewContainer && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        previewContainer.innerHTML = `<img src="${e.target.result}" style="max-height: 90px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); margin-top: 6px;">`;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
   }
-  async startSession() {
-    const basePath = document.body.dataset.basePath || '';
-    const response = await fetch(`${basePath}/api/runtime/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignment_id: this.root.dataset.assignmentId })
+
+  // Master Video feedback
+  if (input.id === 'video-input') {
+    const videoFilenameEl = document.getElementById('video-filename');
+    if (videoFilenameEl && input.files[0]) {
+      const file = input.files[0];
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      videoFilenameEl.textContent = `✓ Selected Video: ${file.name} (${mb} MB)`;
+    }
+  }
+
+  // Audio files list & scene dropdown sync
+  if (input.id === 'audio-input') {
+    const audioListEl = document.getElementById('audio-file-list');
+    if (audioListEl) {
+      audioListEl.innerHTML = '';
+      Array.from(input.files).forEach(f => {
+        const row = document.createElement('div');
+        row.className = 'audio-file-row';
+        row.innerHTML = `<span style="font-size: 13px; color: #a78bfa;">🎵 ${f.name} (${(f.size / 1024).toFixed(0)} KB)</span>`;
+        audioListEl.appendChild(row);
+      });
+    }
+
+    // Sync all scene audio selects
+    document.querySelectorAll('.scene-audio-select').forEach(select => {
+      const currentSelected = select.value;
+      select.innerHTML = '<option value="">-- None --</option>';
+      Array.from(input.files).forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.name;
+        opt.textContent = f.name;
+        if (f.name === currentSelected) opt.selected = true;
+        select.appendChild(opt);
+      });
     });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.message || 'Unable to start playback.');
-    this.sessionId = data.session_id;
   }
-  tick() {
-    const active = this.timeline.sceneAt(this.video.time());
-    if (!active) return;
-    if (active.index !== this.sceneIndex) {
-      this.sceneIndex = active.index;
-      this.audio.switchTo(active.scene.audio, Number(active.scene.audio_volume ?? 1)).catch((error) => this.render(error.message));
-      this.lighting?.apply(active.scene);
-    }
-    this.renderStatus(active);
-  }
-  renderStatus(active) {
-    const scene = active.scene;
-    this.status.innerHTML = `
-      <div><strong>Current Scene</strong><span>${active.index + 1}</span></div>
-      <div><strong>Elapsed Time</strong><span>${Math.floor(this.video.time())}s</span></div>
-      <div><strong>Current Audio</strong><span>${scene.audio || '-'}</span></div>
-      <div><strong>Brightness</strong><span>${scene.brightness}</span></div>
-      <div><strong>CCT</strong><span>${scene.cct}</span></div>
-      <div><strong>RGB</strong><span>${(scene.rgb || []).join(', ')}</span></div>
-      <div><strong>Frequency</strong><span>${scene.frequency || '-'}</span></div>
-      <div><strong>Connection</strong><span>${this.wled?.connected ? 'Validated' : 'Sending'}</span></div>`;
-  }
-  render(message) { if (this.status) this.status.innerHTML = `<p class="empty">${message}</p>`; }
-  async end(completed = false) {
-    this.video.pause();
-    this.audio.stop();
-    if (this.root.dataset.mode === 'tutor' && this.sessionId) {
-      const basePath = document.body.dataset.basePath || '';
-      await fetch(`${basePath}/api/runtime/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: this.sessionId,
-          assignment_id: this.root.dataset.assignmentId,
-          completed,
-          duration: this.startedAt ? Math.round((Date.now() - this.startedAt) / 1000) : null
-        })
-      }).catch(() => {});
-      if (completed) window.location.href = `${basePath}/tutor/modules`;
+
+  // Config JSON auto-import
+  if (input.id === 'config-json-input') {
+    const file = input.files[0];
+    if (file && getFileExt(file.name) === 'json') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const config = JSON.parse(e.target.result);
+          populateFormFromConfig(config);
+        } catch (err) {
+          showDropzoneError(zone, 'Invalid JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
     }
   }
 }
 
-document.querySelectorAll('[data-runtime]').forEach((root) => {
-  const runtime = new RuntimeController(root);
-  root.querySelector('[data-runtime-start]')?.addEventListener('click', () => runtime.start());
-  root.querySelector('[data-runtime-stop]')?.addEventListener('click', () => runtime.end(false));
+function populateFormFromConfig(config) {
+  if (!config || typeof config !== 'object') return;
+
+  const nameInput = document.querySelector('input[name="name"]');
+  if (nameInput && (config.module_name || config.name || config.title)) {
+    nameInput.value = config.module_name || config.name || config.title;
+  }
+
+  const descTextarea = document.querySelector('textarea[name="description"]');
+  if (descTextarea && config.description) {
+    descTextarea.value = config.description;
+  }
+
+  const videoName = config.video || config.video_name;
+  const videoFilenameEl = document.getElementById('video-filename');
+  if (videoName && videoFilenameEl) {
+    videoFilenameEl.textContent = '✓ Referenced video in config: ' + videoName;
+  }
+
+  const timeline = config.timeline || config.scenes;
+  if (Array.isArray(timeline) && timeline.length > 0) {
+    const list = document.getElementById('scene-list');
+    if (list) {
+      list.innerHTML = '';
+      timeline.forEach((scene, i) => {
+        list.insertAdjacentHTML('beforeend', createSceneRow(i, scene));
+      });
+      if (typeof window.updateSceneIndices === 'function') {
+        window.updateSceneIndices();
+      }
+    }
+  }
+
+  const banner = document.getElementById('config-json-banner');
+  if (banner) {
+    const sceneCount = Array.isArray(timeline) ? timeline.length : 0;
+    banner.style.display = 'block';
+    banner.innerHTML = `<strong>✓ Config Loaded!</strong> Auto-filled module details and ${sceneCount} scene timeline item(s) from JSON.`;
+  }
+}
+
+function initAudioManager() {
+  const list = document.getElementById('audio-file-list');
+  if (!list) return;
+
+  let currentAudio = null;
+  let currentBtn = null;
+
+  list.addEventListener('click', (e) => {
+    const previewBtn = e.target.closest('.preview-btn');
+    if (previewBtn) {
+      const url = previewBtn.dataset.url;
+      if (currentAudio && currentBtn === previewBtn) {
+        if (!currentAudio.paused) {
+          currentAudio.pause();
+          previewBtn.textContent = '▶';
+        } else {
+          currentAudio.play();
+          previewBtn.textContent = '⏸';
+        }
+      } else {
+        if (currentAudio) {
+          currentAudio.pause();
+          if (currentBtn) currentBtn.textContent = '▶';
+        }
+        currentAudio = new Audio(url);
+        currentAudio.play();
+        currentBtn = previewBtn;
+        previewBtn.textContent = '⏸';
+        currentAudio.onended = () => previewBtn.textContent = '▶';
+      }
+    }
+  });
+}
+
+function validateIp(ip) {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
+}
+
+function initTestModal() {
+  const triggers = document.querySelectorAll('[data-test-module]');
+  const modal = document.getElementById('test-modal');
+  if (!triggers.length || !modal) return;
+
+  const backdrop = modal.closest('.modal-backdrop') || modal;
+  const ipInput = modal.querySelector('input[name="esp32_ip"]');
+  const ipStatus = modal.querySelector('.ip-status');
+
+  triggers.forEach(t => {
+    t.addEventListener('click', () => {
+      backdrop.classList.add('open');
+    });
+  });
+
+  if (ipInput) {
+    ipInput.addEventListener('input', () => {
+      if (validateIp(ipInput.value)) {
+        ipStatus.textContent = '✓';
+        ipStatus.className = 'ip-status valid';
+      } else {
+        ipStatus.textContent = 'Invalid format';
+        ipStatus.className = 'ip-status invalid';
+      }
+    });
+  }
+
+  const closeBtn = modal.querySelector('[data-close-modal]');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => backdrop.classList.remove('open'));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initSceneBuilder();
+  initAllDropZones();
+  initAudioManager();
+  initTestModal();
 });
