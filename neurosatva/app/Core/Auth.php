@@ -2,6 +2,11 @@
 
 final class Auth
 {
+    public static function check(): bool
+    {
+        return self::user() !== null;
+    }
+
     public static function user(): ?array
     {
         return $_SESSION['user'] ?? null;

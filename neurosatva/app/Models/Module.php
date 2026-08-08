@@ -34,7 +34,7 @@ final class Module
         
         foreach ($modules as &$row) {
             $dir = self::storagePath($row['folder_name']);
-            $row['audio_count'] = count(glob($dir . '/*.mp3') ?: []);
+            $row['audio_count'] = count(glob($dir . '/*.{mp3,wav,ogg,m4a,aac}', GLOB_BRACE) ?: []);
             
             $config = self::getConfig($row['id']);
             $row['scene_count'] = count($config['timeline'] ?? []);

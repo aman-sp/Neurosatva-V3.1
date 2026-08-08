@@ -56,16 +56,44 @@ final class ApiController
             $this->json(['error' => 'Module configuration missing'], 500);
         }
         // Build file URLs for video and audio
-        $baseUrl = rtrim(app_config('url'), '/');
         $folderName = $assignment['folder_name'];
-        $config['_video_url'] = $baseUrl . '/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($config['video']);
+        $config['_video_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($config['video']));
         $config['_esp32_ip'] = $assignment['esp32_ip'];
         $config['_assignment_id'] = $assignmentId;
         // Audio URLs
         if (isset($config['timeline']) && is_array($config['timeline'])) {
             foreach ($config['timeline'] as &$scene) {
                 if (!empty($scene['audio'])) {
-                    $scene['_audio_url'] = $baseUrl . '/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($scene['audio']);
+                    $scene['_audio_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($scene['audio']));
+                }
+            }
+        }
+        $this->json($config);
+    }
+
+    // GET /api/admin/module?id={id}&ip={ip} — admin only, returns config for module test
+    public function adminModule(): void
+    {
+        $this->requireAdmin();
+        $moduleId = (int) input('id');
+        $esp32Ip = trim(input('ip') ?? '');
+        $module = Module::find($moduleId);
+        if (!$module) {
+            $this->json(['error' => 'Module not found'], 404);
+        }
+        $config = Module::getConfig($moduleId);
+        if (!$config) {
+            $this->json(['error' => 'Module configuration missing'], 500);
+        }
+        $folderName = $module['folder_name'];
+        $config['_video_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($config['video']));
+        $config['_esp32_ip'] = $esp32Ip;
+        $config['_module_id'] = $moduleId;
+        $config['_test_mode'] = true;
+        if (isset($config['timeline']) && is_array($config['timeline'])) {
+            foreach ($config['timeline'] as &$scene) {
+                if (!empty($scene['audio'])) {
+                    $scene['_audio_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($scene['audio']));
                 }
             }
         }
@@ -150,14 +178,9 @@ final class ApiController
         $this->json(['success' => true, 'config' => $config]);
     }
 
-    // GET /storage-serve/modules?folder=X&file=Y — serves module files with auth check
+    // GET /storage-serve/modules?folder=X&file=Y — serves module files
     public function serveModuleFile(): void
     {
-        if (!Auth::check()) {
-            http_response_code(401);
-            exit('Unauthorized');
-        }
-        
         $folder = basename(input('folder') ?? ''); 
         $file = basename(input('file') ?? '');
         
@@ -196,13 +219,24 @@ final class ApiController
         $mimeTypes = [
             'mp4' => 'video/mp4',
             'mov' => 'video/quicktime',
+            'webm' => 'video/webm',
+            'mkv' => 'video/x-matroska',
             'mp3' => 'audio/mpeg',
+            'ogg' => 'audio/ogg',
+            'wav' => 'audio/wav',
+            'm4a' => 'audio/mp4',
+            'aac' => 'audio/aac',
             'json' => 'application/json',
             'png' => 'image/png',
             'jpg' => 'image/jpeg',
             'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
         ];
         $mime = $mimeTypes[$ext] ?? 'application/octet-stream';
+        
+        if (ob_get_level()) {
+            @ob_end_clean();
+        }
         
         // Support range requests for video streaming
         $fileSize = filesize($fullPath);
@@ -215,9 +249,13 @@ final class ApiController
             $end = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : $fileSize - 1;
             http_response_code(206);
             header('Content-Range: bytes ' . $start . '-' . $end . '/' . $fileSize);
-            header('Accept-Ranges: bytes');
         }
         
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
+        header('Access-Control-Allow-Headers: Range, Content-Type');
+        header('Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges');
+        header('Accept-Ranges: bytes');
         header('Content-Type: ' . $mime);
         header('Content-Length: ' . ($end - $start + 1));
         header('Cache-Control: private, max-age=3600');
@@ -225,10 +263,12 @@ final class ApiController
         $fp = fopen($fullPath, 'rb');
         fseek($fp, $start);
         $remaining = $end - $start + 1;
-        while (!feof($fp) && $remaining > 0) {
-            $chunk = fread($fp, min(8192, $remaining));
+        while (!feof($fp) && $remaining > 0 && !connection_aborted()) {
+            $chunk = fread($fp, min(32768, $remaining));
             echo $chunk;
             $remaining -= strlen($chunk);
+            @ob_flush();
+            @flush();
         }
         fclose($fp);
         exit;

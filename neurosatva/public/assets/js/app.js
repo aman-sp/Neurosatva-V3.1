@@ -782,9 +782,25 @@ function initTestModal() {
   }
 }
 
+function initModuleFormSubmission() {
+  const form = document.getElementById('module-form');
+  if (!form) return;
+
+  form.addEventListener('submit', function() {
+    const submitBtns = form.querySelectorAll('button[type="submit"]');
+    submitBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Saving &amp; Uploading Module... Please wait...';
+      btn.style.opacity = '0.75';
+      btn.style.cursor = 'wait';
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSceneBuilder();
   initAllDropZones();
   initAudioManager();
   initTestModal();
+  initModuleFormSubmission();
 });

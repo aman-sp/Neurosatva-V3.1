@@ -61,20 +61,41 @@ class WLEDClient {
   }
 
   async setScene(scene) {
-    let bri = 255;
-    if (scene.brightness !== undefined) {
-      bri = Math.round(scene.brightness * 2.55);
+    const bri = scene.brightness !== undefined ? Math.round(parseFloat(scene.brightness) * 2.55) : 255;
+    const rawCct = scene.cct !== undefined && scene.cct !== null ? parseFloat(scene.cct) : 50;
+
+    let cctMireds = 326;
+    if (rawCct <= 100) {
+      cctMireds = Math.round(153 + (Math.min(100, Math.max(0, rawCct)) / 100) * (500 - 153));
+    } else {
+      cctMireds = Math.min(500, Math.max(153, Math.round(rawCct)));
     }
-    const col = scene.rgb || [255, 255, 255];
-    
+
+    const rgbVal = scene.rgb && Array.isArray(scene.rgb) ? scene.rgb : [255, 255, 255];
+    const rgbwVal = [rgbVal[0], rgbVal[1], rgbVal[2], 255];
+
+    const state = {
+      on: true,
+      bri: bri,
+      cct: cctMireds,
+      col: [rgbwVal],
+      seg: [
+        {
+          id: 0,
+          start: 0,
+          stop: 255,
+          on: true,
+          bri: bri,
+          col: [rgbwVal],
+          cct: cctMireds
+        }
+      ]
+    };
+
     return this._fetch('/json/state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        on: true,
-        bri: bri,
-        col: [col]
-      })
+      body: JSON.stringify(state)
     });
   }
 
@@ -118,6 +139,14 @@ class TimelineEngine {
     return this.scenes.length - 1;
   }
 
+  getSceneStartTime(sceneIndex) {
+    let start = 0;
+    for (let i = 0; i < sceneIndex && i < this.scenes.length; i++) {
+      start += parseFloat(this.scenes[i].duration || 0);
+    }
+    return start;
+  }
+
   getTotalDuration() {
     return this.scenes.reduce((acc, scene) => acc + parseFloat(scene.duration || 0), 0);
   }
@@ -158,11 +187,40 @@ class AudioEngine {
   }
 
   async loadAudio(url) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      if (!url) return resolve(null);
       const audio = new Audio(url);
       audio.crossOrigin = "anonymous";
-      audio.oncanplaythrough = () => resolve(audio);
-      audio.onerror = () => reject(new Error('Failed to load audio: ' + url));
+
+      if (audio.readyState >= 2) {
+        return resolve(audio);
+      }
+
+      let timeoutId = setTimeout(() => {
+        cleanup();
+        resolve(audio);
+      }, 4000);
+
+      const onCanPlay = () => {
+        cleanup();
+        resolve(audio);
+      };
+      const onError = () => {
+        cleanup();
+        resolve(null);
+      };
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('canplaythrough', onCanPlay);
+        audio.removeEventListener('loadeddata', onCanPlay);
+        audio.removeEventListener('error', onError);
+      };
+
+      audio.addEventListener('canplay', onCanPlay);
+      audio.addEventListener('canplaythrough', onCanPlay);
+      audio.addEventListener('loadeddata', onCanPlay);
+      audio.addEventListener('error', onError);
       audio.load();
     }).catch(err => {
       console.error(err);
@@ -274,7 +332,7 @@ class AudioEngine {
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(carrierHz + targetHz, this.ctx.currentTime);
 
-      toneGain.gain.setValueAtTime(0.12 * volume, this.ctx.currentTime);
+      toneGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
 
       osc1.connect(toneGain);
       osc2.connect(toneGain);
@@ -301,7 +359,7 @@ class AudioEngine {
       oscR.type = 'sine';
       oscR.frequency.setValueAtTime(carrierHz + targetHz, this.ctx.currentTime);
 
-      toneGain.gain.setValueAtTime(0.12 * volume, this.ctx.currentTime);
+      toneGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
 
       oscL.connect(merger, 0, 0);
       oscR.connect(merger, 0, 1);
@@ -388,6 +446,22 @@ class AudioEngine {
     }
   }
 
+  syncTime(elapsedSeconds, isVideoPlaying) {
+    if (this.currentAudio && this.currentAudio.duration > 0) {
+      if (isVideoPlaying && this.currentAudio.paused) {
+        this.currentAudio.play().catch(e => console.error("Audio auto-resume on sync failed", e));
+      } else if (!isVideoPlaying && !this.currentAudio.paused) {
+        this.currentAudio.pause();
+      }
+      const targetTime = elapsedSeconds % this.currentAudio.duration;
+      if (Math.abs(this.currentAudio.currentTime - targetTime) > 0.4) {
+        try {
+          this.currentAudio.currentTime = targetTime;
+        } catch (e) {}
+      }
+    }
+  }
+
   pause() {
     if (this.currentAudio) this.currentAudio.pause();
     if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
@@ -424,10 +498,44 @@ class VideoEngine {
   }
 
   async load(url) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      if (!url) {
+        resolve();
+        return;
+      }
       this.video.src = url;
-      this.video.oncanplay = () => resolve();
-      this.video.onerror = (e) => reject(new Error('Failed to load video'));
+
+      if (this.video.readyState >= 1) {
+        resolve();
+        return;
+      }
+
+      let timeoutId = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 4000);
+
+      const onCanPlay = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (e) => {
+        cleanup();
+        console.warn('Video stream warning for:', url, e);
+        resolve();
+      };
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        this.video.removeEventListener('canplay', onCanPlay);
+        this.video.removeEventListener('loadeddata', onCanPlay);
+        this.video.removeEventListener('loadedmetadata', onCanPlay);
+        this.video.removeEventListener('error', onError);
+      };
+
+      this.video.addEventListener('canplay', onCanPlay);
+      this.video.addEventListener('loadeddata', onCanPlay);
+      this.video.addEventListener('loadedmetadata', onCanPlay);
+      this.video.addEventListener('error', onError);
       this.video.load();
     });
   }
@@ -438,6 +546,10 @@ class VideoEngine {
 
   pause() {
     this.video.pause();
+  }
+
+  resume() {
+    return this.video.play();
   }
 
   get currentTime() { return this.video.currentTime; }
@@ -455,27 +567,41 @@ class LightingEngine {
     this.isConnected = false;
     this.lastError = null;
     this.lastSceneJson = null;
+    this.appliedSceneIdx = -1;
+    this.isPending = false;
+    this.lastAttemptTime = 0;
   }
 
-  async applyScene(scene) {
+  async applyScene(scene, sceneIdx) {
     if (!scene) return;
     const sceneJson = JSON.stringify({
       rgb: scene.rgb,
-      brightness: scene.brightness
+      brightness: scene.brightness,
+      cct: scene.cct
     });
     
-    if (this.lastSceneJson === sceneJson && this.isConnected) return; // Optimization
-    
+    if (this.appliedSceneIdx === sceneIdx && this.lastSceneJson === sceneJson && this.isConnected) return;
+
+    const now = Date.now();
+    if (this.isPending) return;
+    if (!this.isConnected && (now - this.lastAttemptTime < 2500)) return;
+
+    this.isPending = true;
+    this.lastAttemptTime = now;
+
     try {
       await this.client.setScene(scene);
       this.isConnected = true;
       this.lastError = null;
       this.lastSceneJson = sceneJson;
+      this.appliedSceneIdx = sceneIdx;
       document.dispatchEvent(new CustomEvent('wled-success'));
     } catch (err) {
       this.isConnected = false;
       this.lastError = err.message;
       document.dispatchEvent(new CustomEvent('wled-error', { detail: err.message }));
+    } finally {
+      this.isPending = false;
     }
   }
 
@@ -565,6 +691,10 @@ class RuntimeController {
     this.ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
     this.tickInterval = null;
     this.activeSceneIndex = -1;
+    this.startTime = 0;
+    this.pauseOffset = 0;
+    this.isPaused = false;
+    this.lastPauseTime = 0;
   }
 
   async init() {
@@ -590,7 +720,11 @@ class RuntimeController {
     this.hud.update({ connectionStatus: 'connected', connectionText: 'Connected' });
 
     if (this.config._video_url) {
-      await this.video.load(this.config._video_url);
+      try {
+        await this.video.load(this.config._video_url);
+      } catch (err) {
+        console.warn("Video asset load warning:", err);
+      }
     }
 
     document.addEventListener('wled-error', (e) => {
@@ -604,14 +738,54 @@ class RuntimeController {
     });
   }
 
+  get currentTime() {
+    let t = this.videoElement ? this.videoElement.currentTime : 0;
+    const fallbackTime = Math.max(0, (Date.now() - this.startTime - this.pauseOffset) / 1000);
+    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0) {
+      t = fallbackTime;
+    }
+    return t;
+  }
+
   async start() {
+    this.startTime = Date.now();
+    this.pauseOffset = 0;
+    this.isPaused = false;
+    this.audio.initContext();
+
     try {
       await this.video.play();
-      this.tickInterval = setInterval(this._tick.bind(this), 250);
     } catch (err) {
-      console.error("Failed to start playback", err);
-      this.stop(err);
+      console.warn("Primary video.play() failed, attempting muted fallback playback:", err);
+      try {
+        this.videoElement.muted = true;
+        await this.video.play();
+      } catch (err2) {
+        console.warn("Video playback unavailable on this browser/codec, running session audio & lighting clock:", err2);
+      }
     }
+
+    if (!this.tickInterval) {
+      this.tickInterval = setInterval(this._tick.bind(this), 250);
+    }
+  }
+
+  pause() {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    this.lastPauseTime = Date.now();
+    this.video.pause();
+    this.audio.pause();
+  }
+
+  resume() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    if (this.lastPauseTime > 0) {
+      this.pauseOffset += (Date.now() - this.lastPauseTime);
+    }
+    this.video.resume();
+    this.audio.resume();
   }
 
   async stop(error = null) {
@@ -624,31 +798,62 @@ class RuntimeController {
   }
 
   _tick() {
+    if (this.isPaused) return;
+
+    let t = this.video.currentTime;
+    const fallbackTime = Math.max(0, (Date.now() - this.startTime - this.pauseOffset) / 1000);
+    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0) {
+      t = fallbackTime;
+    }
+
+    const totalDuration = this.timeline.getTotalDuration();
+    if (totalDuration > 0 && t >= totalDuration) {
+      this.stop();
+      return;
+    }
+
     if (this.video.ended) {
       this.stop();
       return;
     }
 
-    const t = this.video.currentTime;
     const scene = this.timeline.getActiveScene(t);
     const sceneIdx = this.timeline.getSceneIndex(t);
+    const sceneStart = this.timeline.getSceneStartTime(sceneIdx);
+    const sceneElapsed = Math.max(0, t - sceneStart);
 
-    if (scene && sceneIdx !== this.activeSceneIndex) {
-      this.activeSceneIndex = sceneIdx;
-      
-      this.lighting.applyScene(scene);
-      
-      if (scene._audio_url) {
-        this.audio.switchTo(scene._audio_url, scene.audio_volume !== undefined ? scene.audio_volume : 1, scene.modulation, scene.frequency);
-      } else {
-        this.audio.stop();
+    if (scene) {
+      this.lighting.applyScene(scene, sceneIdx);
+
+      if (sceneIdx !== this.activeSceneIndex) {
+        this.activeSceneIndex = sceneIdx;
+        
+        if (scene._audio_url) {
+          this.audio.switchTo(scene._audio_url, scene.audio_volume !== undefined ? scene.audio_volume : 1, scene.modulation, scene.frequency);
+        } else {
+          this.audio.stop();
+        }
+      }
+    }
+
+    if (this.audio) {
+      this.audio.syncTime(sceneElapsed, !this.isPaused);
+    }
+
+    let audioDisplayName = '-';
+    if (scene) {
+      if (scene.audio) {
+        audioDisplayName = scene.audio;
+      } else if (scene._audio_url) {
+        const match = scene._audio_url.match(/file=([^&]+)/);
+        audioDisplayName = match ? decodeURIComponent(match[1]) : scene._audio_url.split('/').pop();
       }
     }
 
     this.hud.update({
       scene: `Scene ${this.activeSceneIndex + 1}`,
       elapsed: t,
-      audio: scene ? (scene._audio_url ? scene._audio_url.split('/').pop() : 'None') : '-',
+      audio: audioDisplayName,
       brightness: scene ? scene.brightness : 0,
       cct: scene ? scene.cct : 0,
       rgb: scene ? scene.rgb : [0,0,0]

@@ -34,6 +34,8 @@ final class ModuleController
 
     public function store(): void
     {
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
         $this->guard();
         $this->checkPostMaxSize();
         Csrf::verify();
@@ -203,6 +205,8 @@ final class ModuleController
 
     public function update(): void
     {
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
         $this->guard();
         $this->checkPostMaxSize();
         Csrf::verify();
@@ -369,6 +373,46 @@ final class ModuleController
 
         Session::flash('success', 'Module deleted successfully.');
         redirect('/admin/vault');
+    }
+
+    public function test(): void
+    {
+        $this->guard();
+        $id = (int) input('id');
+        $ip = trim(input('ip') ?? '');
+
+        $module = Module::find($id);
+        if (!$module) {
+            Session::flash('error', 'Module not found.');
+            redirect('/admin/vault');
+        }
+
+        $config = Module::getConfig($id);
+        if (!$config) {
+            Session::flash('error', 'Module configuration is missing or corrupt.');
+            redirect('/admin/vault');
+        }
+
+        if (!$ip || !filter_var($ip, FILTER_VALIDATE_IP)) {
+            Session::flash('error', 'Valid ESP32 IP address is required for testing.');
+            redirect('/admin/vault');
+        }
+
+        $assignment = [
+            'id' => 0,
+            'module_id' => $module['id'],
+            'module_name' => $module['name'],
+            'esp32_ip' => $ip,
+            'remaining_plays' => '∞ (Test Mode)',
+            'is_test' => true
+        ];
+
+        view('admin/vault-test', [
+            'title' => 'Test Module: ' . e($module['name']),
+            'module' => $module,
+            'assignment' => $assignment,
+            'config' => $config,
+        ]);
     }
 
     public function assignForm(): void
