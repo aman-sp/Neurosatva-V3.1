@@ -3,11 +3,19 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /neurosatva/
 
+    # Prevent direct access to protected directories
+    RewriteRule ^(\.git|\.env|app|config|database|storage)(/.*)?$ - [F,L]
+
+    # Serve public assets directly if accessed via /assets/
     RewriteRule ^assets/(.*)$ public/assets/$1 [L]
 
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
+    # If the request is for an existing file or directory, serve it
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route all other traffic to public/index.php
     RewriteRule ^(.*)$ public/index.php [QSA,L]
 </IfModule>
+

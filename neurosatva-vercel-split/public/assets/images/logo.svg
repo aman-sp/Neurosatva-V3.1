@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 180" role="img" aria-labelledby="logoTitle">
+  <title id="logoTitle">NeuroSatva</title>
+  <defs>
+    <linearGradient id="neuroSatvaGradient" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#0f3f8f"/>
+      <stop offset=".28" stop-color="#28116f"/>
+      <stop offset=".48" stop-color="#5521b6"/>
+      <stop offset=".66" stop-color="#0b8fa1"/>
+      <stop offset="1" stop-color="#008b82"/>
+    </linearGradient>
+    <filter id="softShadow" x="-5%" y="-10%" width="110%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="2" flood-color="#0b1f45" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="1000" height="180" fill="#fff"/>
+  <text x="10" y="133"
+        fill="url(#neuroSatvaGradient)"
+        filter="url(#softShadow)"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="128"
+        font-weight="700"
+        letter-spacing="-5">NEURO<tspan font-weight="400">S</tspan>ATVA</text>
+  <circle cx="724" cy="112" r="8" fill="#139c96"/>
+  <circle cx="953" cy="112" r="8" fill="#139c96"/>
+</svg>

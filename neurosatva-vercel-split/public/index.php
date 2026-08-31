@@ -19,19 +19,18 @@ foreach (glob(dirname(__DIR__) . '/app/Controllers/*.php') as $file) {
 
 Session::start();
 
-$frontendUrl = env('FRONTEND_URL');
-if ($frontendUrl) {
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
+
+if (str_starts_with($requestUri, '/api') && request_method() === 'OPTIONS') {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin && (rtrim($origin, '/') === rtrim($frontendUrl, '/') || $frontendUrl === '*')) {
+    $frontendUrl = app_config('frontend_url');
+    if ($frontendUrl && $origin === $frontendUrl) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
+        header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     }
-    if (request_method() === 'OPTIONS') {
-        http_response_code(200);
-        exit;
-    }
+    exit;
 }
 
 if (app_config('debug')) {
@@ -94,6 +93,18 @@ $router->get('/tutor/vault/play', [TutorVaultController::class, 'play']);
 
 // === JSON API ===
 $router->get('/api/modules', [ApiController::class, 'modules']);
+$router->post('/api/auth/login', [ApiController::class, 'authLogin']);
+$router->post('/api/auth/logout', [ApiController::class, 'authLogout']);
+$router->get('/api/auth/me', [ApiController::class, 'authMe']);
+$router->get('/api/health', [ApiController::class, 'health']);
+$router->get('/api/admin/dashboard', [ApiController::class, 'adminDashboard']);
+$router->get('/api/tutor/dashboard', [ApiController::class, 'tutorDashboard']);
+$router->get('/api/admin/tutors', [ApiController::class, 'adminTutors']);
+$router->get('/api/admin/registration-requests', [ApiController::class, 'adminRegistrationRequests']);
+$router->post('/api/admin/registration-requests/approve', [ApiController::class, 'approveRegistrationRequest']);
+$router->post('/api/admin/registration-requests/reject', [ApiController::class, 'rejectRegistrationRequest']);
+$router->post('/api/admin/tutors/update', [ApiController::class, 'updateTutor']);
+$router->post('/api/admin/tutors/delete', [ApiController::class, 'deleteTutor']);
 $router->get('/api/tutor/modules', [ApiController::class, 'tutorModules']);
 $router->get('/api/tutor/module', [ApiController::class, 'tutorModule']);
 $router->get('/api/admin/module', [ApiController::class, 'adminModule']);
@@ -105,7 +116,7 @@ $router->post('/api/modules/test', [ApiController::class, 'testModule']);
 $router->get('/storage-serve/modules', [ApiController::class, 'serveModuleFile']);
 
 try {
-    $router->dispatch(request_method(), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/');
+    $router->dispatch(request_method(), $requestUri);
 } catch (PDOException $exception) {
     http_response_code(500);
     view('errors/database', ['title' => 'Database Setup Required'], 'auth');
