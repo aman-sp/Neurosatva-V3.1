@@ -768,6 +768,24 @@ class RuntimeController {
     if (!this.tickInterval) {
       this.tickInterval = setInterval(this._tick.bind(this), 250);
     }
+
+    // If a timeline scroller exists on the page, initialize it
+    try {
+      const scroller = document.getElementById('timeline-scroller');
+      const timeCurrent = document.getElementById('time-current');
+      const timeTotal = document.getElementById('time-total');
+      if (scroller && timeCurrent && timeTotal) {
+        const total = this.timeline.getTotalDuration();
+        scroller.max = total || 0;
+        timeTotal.textContent = Math.floor(total/60) + ':' + String(Math.floor(total%60)).padStart(2,'0');
+        scroller.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          if (this.video && !isNaN(val)) {
+            try { this.videoElement.currentTime = val; } catch (err) {}
+          }
+        });
+      }
+    } catch (e) { console.warn('Timeline init failed', e); }
   }
 
   pause() {
@@ -858,6 +876,19 @@ class RuntimeController {
       cct: scene ? scene.cct : 0,
       rgb: scene ? scene.rgb : [0,0,0]
     });
+
+    // Update timeline scroller and current time display if present
+    try {
+      const scroller = document.getElementById('timeline-scroller');
+      const timeCurrent = document.getElementById('time-current');
+      if (scroller) {
+        scroller.value = t;
+      }
+      if (timeCurrent) {
+        const s = Math.floor(t);
+        timeCurrent.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+      }
+    } catch (e) {}
   }
 }
 

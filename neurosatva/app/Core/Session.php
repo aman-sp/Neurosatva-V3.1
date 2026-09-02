@@ -8,15 +8,12 @@ final class Session
             return;
         }
 
-        $isHttps = (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on')
-            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
-
         session_set_cookie_params([
             'lifetime' => 0,
             'path' => '/',
             'httponly' => true,
             'samesite' => 'Lax',
-            'secure' => $isHttps,
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
         ]);
         session_start();
     }

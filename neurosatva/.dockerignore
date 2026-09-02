@@ -1,8 +1,0 @@
-﻿.git
-.gitignore
-.env
-Dockerfile
-.dockerignore
-node_modules
-admin-login-preview.html
-*.md

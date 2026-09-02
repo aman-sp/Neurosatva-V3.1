@@ -9,8 +9,25 @@ function app_config(?string $key = null): mixed
 
 function path(string $uri = ''): string
 {
-    $base = parse_url(app_config('url'), PHP_URL_PATH) ?: '';
-    return rtrim($base, '/') . '/' . ltrim($uri, '/');
+    $url = app_config('url') ?: '';
+    $base = parse_url($url, PHP_URL_PATH) ?: '';
+    // If base resolves to just '/' or '', don't double-slash
+    $base = rtrim($base, '/');
+    return $base . '/' . ltrim($uri, '/');
+}
+
+/**
+ * Returns a cache-busting version string for a public asset.
+ * Uses filemtime() when the file is readable (local/Docker),
+ * falls back to APP_VERSION env var or a deploy timestamp.
+ */
+function asset_version(string $relativePath): string
+{
+    $abs = dirname(__DIR__, 2) . '/public' . '/' . ltrim($relativePath, '/');
+    if (is_readable($abs)) {
+        return (string) filemtime($abs);
+    }
+    return env('APP_VERSION', '1');
 }
 
 function redirect(string $uri): never

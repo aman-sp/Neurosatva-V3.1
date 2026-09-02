@@ -105,7 +105,7 @@ const MODULE_CONFIG_URL = <?= json_encode(path('/api/tutor/module?id=' . (int) $
 const API_RUNTIME_START = <?= json_encode(path('/api/runtime/start')) ?>;
 const API_RUNTIME_END = <?= json_encode(path('/api/runtime/end')) ?>;
 </script>
-<script src="<?= e(path('/assets/js/runtime.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/runtime.js'))) ?>"></script>
+<script src="<?= e(path('/assets/js/runtime.js?v=' . asset_version('assets/js/runtime.js'))) ?>"></script>
 <script>
 // Player initialization
 document.addEventListener('DOMContentLoaded', async function() {

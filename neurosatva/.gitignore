@@ -1,5 +1,17 @@
 .env
+
+# Uploaded module media (large binary files - serve from cloud storage)
+/storage/modules/**/*.mp4
+/storage/modules/**/*.mp3
+/storage/modules/**/*.wav
+/storage/modules/**/*.webm
+# But keep module config JSON
+!/storage/modules/**/config.json
+
 /storage/videos/*
 !/storage/videos/.gitkeep
 /storage/logs/*
 !/storage/logs/.gitkeep
+
+# Local test files
+/test-play.html

@@ -173,5 +173,5 @@
     </form>
 </div>
 
-<script src="<?= e(path('/assets/js/runtime.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/runtime.js'))) ?>"></script>
-<script src="<?= e(path('/assets/js/app.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js'))) ?>"></script>
+<script src="<?= e(path('/assets/js/runtime.js?v=' . asset_version('assets/js/runtime.js'))) ?>"></script>
+<script src="<?= e(path('/assets/js/app.js?v=' . asset_version('assets/js/app.js'))) ?>"></script>

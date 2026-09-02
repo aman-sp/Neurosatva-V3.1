@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "buildCommand": null,
+  "outputDirectory": "neurosatva/public",
+  "functions": {
+    "neurosatva/public/index.php": {
+      "runtime": "vercel-php@0.7.2"
+    }
+  },
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "dest": "/neurosatva/public/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/neurosatva/public/index.php"
+    }
+  ]
+}

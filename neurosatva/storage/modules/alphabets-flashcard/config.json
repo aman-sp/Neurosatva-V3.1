@@ -1,0 +1,51 @@
+{
+    "module_name": "Alphabets Flashcard",
+    "video": "ABC Flashcards.mp4",
+    "timeline": [
+        {
+            "duration": 360,
+            "state": "Mindful Breathing",
+            "audio": "forest_ambience.mp3",
+            "audio_volume": 0.8,
+            "frequency": "6 Hz",
+            "modulation": "None",
+            "brightness": 100,
+            "cct": 30,
+            "rgb": [
+                120,
+                0,
+                255
+            ]
+        },
+        {
+            "duration": 360,
+            "state": "Focus",
+            "audio": "brown_noise.mp3",
+            "audio_volume": 0.4,
+            "frequency": "40 Hz",
+            "modulation": "Binaural Beat",
+            "brightness": 100,
+            "cct": 100,
+            "rgb": [
+                255,
+                0,
+                100
+            ]
+        },
+        {
+            "duration": 381,
+            "state": "Calm",
+            "audio": "ocean_waves.mp3",
+            "audio_volume": 0.6,
+            "frequency": "6 Hz",
+            "modulation": "None",
+            "brightness": 100,
+            "cct": 30,
+            "rgb": [
+                120,
+                0,
+                255
+            ]
+        }
+    ]
+}

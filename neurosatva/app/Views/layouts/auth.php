@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title ?? app_config('name')) ?> | <?= e(app_config('name')) ?></title>
-    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/css/app.css'))) ?>">
+    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css?v=' . asset_version('assets/css/app.css'))) ?>">
 </head>
 <body class="auth-body glass-auth-body">
     <div class="gradient-mesh" aria-hidden="true"></div>

@@ -2,7 +2,7 @@
 
 return [
     'name' => env('APP_NAME', 'Neurosatva'),
-    'url' => rtrim(env('APP_URL', 'http://localhost/neurosatva/public'), '/'),
+    'url' => rtrim(env('APP_URL', ''), '/'),
     'env' => env('APP_ENV', 'production'),
     'debug' => filter_var(env('APP_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
     'admin_video_email' => env('ADMIN_VIDEO_EMAIL', 'videos@neurosatva.local'),

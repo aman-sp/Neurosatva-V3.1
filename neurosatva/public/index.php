@@ -19,21 +19,6 @@ foreach (glob(dirname(__DIR__) . '/app/Controllers/*.php') as $file) {
 
 Session::start();
 
-$frontendUrl = env('FRONTEND_URL');
-if ($frontendUrl) {
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin && (rtrim($origin, '/') === rtrim($frontendUrl, '/') || $frontendUrl === '*')) {
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
-    }
-    if (request_method() === 'OPTIONS') {
-        http_response_code(200);
-        exit;
-    }
-}
-
 if (app_config('debug')) {
     ini_set('display_errors', '1');
     error_reporting(E_ALL);

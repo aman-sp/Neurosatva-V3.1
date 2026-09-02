@@ -34,11 +34,19 @@
     </div>
 
     <!-- Controls below video -->
-    <div class="player-controls" id="player-controls" style="display:none; margin-top: 16px; align-items: center; gap: 12px; background: var(--panel-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-      <button id="pause-btn" class="button ghost">⏸ Pause</button>
-      <button id="stop-btn" class="button danger">⏹ Stop Test Session</button>
-      <button id="fullscreen-btn" class="button ghost" title="Fullscreen">⛶ Fullscreen</button>
-      <span style="color: var(--text); font-size: 16px; font-weight: 500; font-family: monospace; margin-left: auto;" id="elapsed-display">0:00</span>
+    <div class="player-controls" id="player-controls" style="display:none; margin-top: 16px; align-items: center; gap: 12px; background: var(--panel-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); flex-direction: column;">
+      <!-- Timeline scroller -->
+      <div style="width:100%; display:flex; align-items:center; gap:12px;">
+        <span id="time-current" style="min-width:46px; text-align:left; font-family: monospace;">0:00</span>
+        <input id="timeline-scroller" type="range" min="0" max="0" step="0.1" value="0" style="flex:1;" />
+        <span id="time-total" style="min-width:46px; text-align:right; font-family: monospace;">0:00</span>
+      </div>
+      <div style="display:flex; width:100%; align-items:center; gap:12px; margin-top:12px;">
+        <button id="pause-btn" class="button ghost">⏸ Pause</button>
+        <button id="stop-btn" class="button danger">⏹ Stop Test Session</button>
+        <button id="fullscreen-btn" class="button ghost" title="Fullscreen">⛶ Fullscreen</button>
+        <span style="color: var(--text); font-size: 16px; font-weight: 500; font-family: monospace; margin-left: auto;" id="elapsed-display">0:00</span>
+      </div>
     </div>
 
     <!-- Error Banner -->
@@ -112,7 +120,7 @@ const MODULE_ID = <?= (int) $module['id'] ?>;
 const ESP32_IP = <?= json_encode($assignment['esp32_ip']) ?>;
 const MODULE_CONFIG_URL = <?= json_encode(path('/api/admin/module?id=' . (int) $module['id'] . '&ip=' . urlencode($assignment['esp32_ip']))) ?>;
 </script>
-<script src="<?= e(path('/assets/js/runtime.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/runtime.js'))) ?>"></script>
+<script src="<?= e(path('/assets/js/runtime.js?v=' . asset_version('assets/js/runtime.js'))) ?>"></script>
 <script>
 // Test player initialization
 document.addEventListener('DOMContentLoaded', async function() {

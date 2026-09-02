@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/css/app.css'))) ?>">
+    <link rel="stylesheet" href="<?= e(path('/assets/css/app.css?v=' . asset_version('assets/css/app.css'))) ?>">
 </head>
 <body class="dashboard-body">
     <div class="app-shell">
@@ -30,6 +30,6 @@
             </main>
         </div>
     </div>
-    <script src="<?= e(path('/assets/js/app.js?v=' . filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js'))) ?>"></script>
+    <script src="<?= e(path('/assets/js/app.js?v=' . asset_version('assets/js/app.js'))) ?>"></script>
 </body>
 </html>
