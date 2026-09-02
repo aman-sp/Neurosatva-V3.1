@@ -8,7 +8,7 @@
   "routes": [
     {
       "src": "/assets/(.*)",
-      "dest": "/neurosatva/public/assets/$1"
+      "dest": "/public/assets/$1"
     },
     {
       "src": "/(.*)",
