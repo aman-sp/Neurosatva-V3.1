@@ -86,14 +86,14 @@ final class ApiController
             $this->json(['error' => 'Module configuration missing'], 500);
         }
         $folderName = $module['folder_name'];
-        $config['_video_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($config['video']));
+        $config['_video_url'] = Module::getMediaUrl($folderName, $config['video'] ?? '');
         $config['_esp32_ip'] = $esp32Ip;
         $config['_module_id'] = $moduleId;
         $config['_test_mode'] = true;
         if (isset($config['timeline']) && is_array($config['timeline'])) {
             foreach ($config['timeline'] as &$scene) {
                 if (!empty($scene['audio'])) {
-                    $scene['_audio_url'] = path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($scene['audio']));
+                    $scene['_audio_url'] = Module::getMediaUrl($folderName, $scene['audio']);
                 }
             }
         }
@@ -164,14 +164,14 @@ final class ApiController
 
         $baseUrl = rtrim(app_config('url'), '/');
         $folderName = $module['folder_name'];
-        $config['_video_url'] = $baseUrl . '/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($config['video']);
+        $config['_video_url'] = Module::getMediaUrl($folderName, $config['video'] ?? '');
         $config['_esp32_ip'] = $esp32Ip;
         $config['_module_id'] = $moduleId;
         $config['_test_mode'] = true;
         if (isset($config['timeline']) && is_array($config['timeline'])) {
             foreach ($config['timeline'] as &$scene) {
                 if (!empty($scene['audio'])) {
-                    $scene['_audio_url'] = $baseUrl . '/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($scene['audio']);
+                    $scene['_audio_url'] = Module::getMediaUrl($folderName, $scene['audio']);
                 }
             }
         }

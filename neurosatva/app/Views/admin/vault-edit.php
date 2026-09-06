@@ -1,5 +1,13 @@
+<script>
+window.SUPABASE_CONFIG = {
+    url: "<?= e(app_config('supabase_url')) ?>",
+    key: "<?= e(app_config('supabase_key')) ?>",
+    bucket: "<?= e(app_config('supabase_bucket') ?: 'modules') ?>"
+};
+</script>
+
 <div class="panel module-editor-card">
-    <form method="post" enctype="multipart/form-data" action="<?= e(path('/admin/vault/update')) ?>" id="module-form" class="stack" style="gap: 28px;">
+    <form method="post" enctype="multipart/form-data" action="<?= e(path('/admin/vault/update')) ?>" id="module-form" class="stack" style="gap: 28px;" data-folder-name="<?= e($module['folder_name']) ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= e($module['id']) ?>">
         <input type="hidden" name="_method" value="PUT">

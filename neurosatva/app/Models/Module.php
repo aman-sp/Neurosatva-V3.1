@@ -119,13 +119,42 @@ final class Module
         if (!$module) {
             return null;
         }
-        $path = self::storagePath($module['folder_name']) . '/config.json';
-        if (!file_exists($path)) {
-            return null;
+        $configPath = $module['config_path'] ?? '';
+        if (str_starts_with($configPath, 'http://') || str_starts_with($configPath, 'https://')) {
+            $json = @file_get_contents($configPath);
+            $data = json_decode($json ?: '', true);
+            return is_array($data) ? $data : null;
         }
-        $json = file_get_contents($path);
-        $data = json_decode($json, true);
-        return is_array($data) ? $data : null;
+        $path = self::storagePath($module['folder_name']) . '/config.json';
+        if (file_exists($path)) {
+            $json = file_get_contents($path);
+            $data = json_decode($json, true);
+            return is_array($data) ? $data : null;
+        }
+        // Fallback to Supabase Storage config URL if file not on local disk
+        $supabaseUrl = self::getMediaUrl($module['folder_name'], 'config.json');
+        if ($supabaseUrl && str_starts_with($supabaseUrl, 'http')) {
+            $json = @file_get_contents($supabaseUrl);
+            $data = json_decode($json ?: '', true);
+            return is_array($data) ? $data : null;
+        }
+        return null;
+    }
+
+    public static function getMediaUrl(string $folderName, ?string $filename): string
+    {
+        if (!$filename) {
+            return '';
+        }
+        if (str_starts_with($filename, 'http://') || str_starts_with($filename, 'https://')) {
+            return $filename;
+        }
+        $supabaseUrl = rtrim((string) (app_config('supabase_url') ?? ''), '/');
+        $bucket = app_config('supabase_bucket') ?: 'modules';
+        if ($supabaseUrl !== '') {
+            return "{$supabaseUrl}/storage/v1/object/public/{$bucket}/{$folderName}/" . rawurlencode($filename);
+        }
+        return path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($filename));
     }
 
     public static function generateFolderName(string $moduleName): string

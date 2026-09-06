@@ -782,18 +782,179 @@ function initTestModal() {
   }
 }
 
+function uploadFileToSupabase(file, folderName, filename, onProgress) {
+  const config = window.SUPABASE_CONFIG;
+  if (!config || !config.url || !config.key) {
+    return Promise.reject(new Error('Supabase Storage is not configured.'));
+  }
+
+  const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folderName}/${cleanFilename}`;
+  const bucket = config.bucket || 'modules';
+  const url = `${config.url.replace(/\/$/, '')}/storage/v1/object/${bucket}/${path}`;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('apikey', config.key);
+    xhr.setRequestHeader('Authorization', `Bearer ${config.key}`);
+    xhr.setRequestHeader('x-upsert', 'true');
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({
+          name: cleanFilename,
+          path: path,
+          url: `${config.url.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${path}`
+        });
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.message || err.error || `Upload failed with status ${xhr.status}`));
+        } catch (_) {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error during Supabase upload. Check your connection or bucket CORS settings.'));
+    xhr.send(file);
+  });
+}
+
 function initModuleFormSubmission() {
   const form = document.getElementById('module-form');
   if (!form) return;
 
-  form.addEventListener('submit', function() {
-    const submitBtns = form.querySelectorAll('button[type="submit"]');
-    submitBtns.forEach(btn => {
-      btn.disabled = true;
-      btn.innerHTML = '⏳ Saving &amp; Uploading Module... Please wait...';
-      btn.style.opacity = '0.75';
-      btn.style.cursor = 'wait';
-    });
+  form.addEventListener('submit', async function(e) {
+    if (form.dataset.submitting === 'true') return;
+
+    const config = window.SUPABASE_CONFIG;
+    if (!config || !config.url || !config.key) {
+      return; // fallback to standard form submit
+    }
+
+    const nameInput = form.querySelector('input[name="name"]');
+    const moduleName = nameInput ? nameInput.value.trim() : 'module';
+    const folderName = form.dataset.folderName || moduleName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'module';
+
+    const videoInput = document.getElementById('video-input');
+    const thumbInput = document.getElementById('thumb-input');
+    const audioInput = document.getElementById('audio-input');
+    const configInput = document.getElementById('config-json-input');
+
+    const videoFile = videoInput && videoInput.files && videoInput.files[0];
+    const thumbFile = thumbInput && thumbInput.files && thumbInput.files[0];
+    const audioFiles = audioInput && audioInput.files ? Array.from(audioInput.files) : [];
+    const configFile = configInput && configInput.files && configInput.files[0];
+
+    // If there are files to upload, stream directly to Supabase to avoid Vercel 4.5MB payload limit
+    if (videoFile || thumbFile || audioFiles.length > 0 || configFile) {
+      e.preventDefault();
+
+      const submitBtns = form.querySelectorAll('button[type="submit"]');
+      const setStatus = (msg) => {
+        submitBtns.forEach(btn => {
+          btn.disabled = true;
+          btn.innerHTML = `⏳ ${msg}`;
+          btn.style.opacity = '0.85';
+          btn.style.cursor = 'wait';
+        });
+      };
+
+      try {
+        if (thumbFile) {
+          setStatus('Uploading Thumbnail to Supabase...');
+          const ext = thumbFile.name.split('.').pop().toLowerCase() || 'png';
+          const thumbRes = await uploadFileToSupabase(thumbFile, folderName, `thumbnail.${ext}`, (pct) => {
+            setStatus(`Uploading Thumbnail: ${pct}%`);
+          });
+          let hThumb = form.querySelector('input[name="supabase_thumbnail_name"]');
+          if (!hThumb) {
+            hThumb = document.createElement('input');
+            hThumb.type = 'hidden';
+            hThumb.name = 'supabase_thumbnail_name';
+            form.appendChild(hThumb);
+          }
+          hThumb.value = thumbRes.name;
+          thumbInput.value = ''; // Prevent binary multipart upload to Vercel
+        }
+
+        if (videoFile) {
+          setStatus('Uploading Master Video to Supabase...');
+          const videoRes = await uploadFileToSupabase(videoFile, folderName, videoFile.name, (pct) => {
+            setStatus(`Uploading Video: ${pct}%`);
+          });
+          let hVideo = form.querySelector('input[name="supabase_video_name"]');
+          if (!hVideo) {
+            hVideo = document.createElement('input');
+            hVideo.type = 'hidden';
+            hVideo.name = 'supabase_video_name';
+            form.appendChild(hVideo);
+          }
+          hVideo.value = videoRes.name;
+          videoInput.value = ''; // Prevent binary multipart upload to Vercel
+        }
+
+        if (audioFiles.length > 0) {
+          for (let i = 0; i < audioFiles.length; i++) {
+            const aFile = audioFiles[i];
+            setStatus(`Uploading Audio (${i + 1}/${audioFiles.length}): ${aFile.name}...`);
+            const aRes = await uploadFileToSupabase(aFile, folderName, aFile.name, (pct) => {
+              setStatus(`Uploading Audio ${i + 1}/${audioFiles.length} (${pct}%)`);
+            });
+            const hAudio = document.createElement('input');
+            hAudio.type = 'hidden';
+            hAudio.name = 'supabase_audio_names[]';
+            hAudio.value = aRes.name;
+            form.appendChild(hAudio);
+          }
+          audioInput.value = ''; // Prevent binary multipart upload to Vercel
+        }
+
+        if (configFile) {
+          setStatus('Uploading Config JSON to Supabase...');
+          const configRes = await uploadFileToSupabase(configFile, folderName, 'config.json');
+          let hConfig = form.querySelector('input[name="supabase_config_url"]');
+          if (!hConfig) {
+            hConfig = document.createElement('input');
+            hConfig.type = 'hidden';
+            hConfig.name = 'supabase_config_url';
+            form.appendChild(hConfig);
+          }
+          hConfig.value = configRes.url;
+          configInput.value = '';
+        }
+
+        setStatus('Finalizing Module in Database...');
+        form.dataset.submitting = 'true';
+        form.submit();
+      } catch (err) {
+        alert('Supabase Upload Error: ' + err.message + '\n\nMake sure the "modules" bucket exists in your Supabase project with Public access.');
+        submitBtns.forEach(btn => {
+          btn.disabled = false;
+          btn.innerHTML = 'Save &amp; Publish Module';
+          btn.style.opacity = '1';
+          btn.style.cursor = 'pointer';
+        });
+      }
+    } else {
+      const submitBtns = form.querySelectorAll('button[type="submit"]');
+      submitBtns.forEach(btn => {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Saving Module...';
+        btn.style.opacity = '0.75';
+        btn.style.cursor = 'wait';
+      });
+    }
   });
 }
 

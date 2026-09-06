@@ -63,11 +63,7 @@ final class ModuleController
 
         $folderName = Module::generateFolderName($name);
         $dir = Module::storagePath($folderName);
-        
-        if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
-            Session::flash('error', 'Failed to create module directory.');
-            redirect('/admin/vault/create');
-        }
+        @mkdir($dir, 0755, true);
 
         // Master Video Upload
         $videoName = null;
@@ -167,13 +163,17 @@ final class ModuleController
             }
         }
 
+        $videoName = input('supabase_video_name') ?: $videoName;
+        $thumbnailName = input('supabase_thumbnail_name') ?: $thumbnailName;
+        $supabaseConfigUrl = input('supabase_config_url');
+
         // Save config.json
-        $configPath = $dir . '/config.json';
+        $configPath = $supabaseConfigUrl ?: ($dir . '/config.json');
         if ($configUploaded && file_exists($_FILES['config_json']['tmp_name'])) {
-            move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
-        } else {
+            @move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
+        } elseif (!$supabaseConfigUrl) {
             $configJson = $this->generateConfig($name, $videoName ?? '', $timeline);
-            file_put_contents($configPath, $configJson);
+            @file_put_contents($configPath, $configJson);
         }
 
         Module::create([
@@ -186,7 +186,7 @@ final class ModuleController
             'created_by' => Auth::id()
         ]);
 
-        Session::flash('success', 'Module created successfully.');
+        Session::flash('success', 'Module created successfully with Supabase Storage.');
         redirect('/admin/vault');
     }
 
@@ -331,22 +331,27 @@ final class ModuleController
         }
 
         $name = trim(input('name') ?? $module['name']);
-        $configPath = $dir . '/config.json';
+        $videoName = input('supabase_video_name') ?: $videoName;
+        $thumbnailName = input('supabase_thumbnail_name') ?: $thumbnailName;
+        $supabaseConfigUrl = input('supabase_config_url');
+
+        $configPath = $supabaseConfigUrl ?: ($module['config_path'] ?: ($dir . '/config.json'));
         if ($configUploaded && file_exists($_FILES['config_json']['tmp_name'])) {
-            move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
-        } else {
+            @move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
+        } elseif (!$supabaseConfigUrl) {
             $configJson = $this->generateConfig($name, $videoName ?? '', $timeline);
-            file_put_contents($configPath, $configJson);
+            @file_put_contents($configPath, $configJson);
         }
 
         Module::update($id, [
             'name' => $name,
             'description' => input('description'),
             'video_name' => $videoName,
-            'thumbnail' => $thumbnailName
+            'thumbnail' => $thumbnailName,
+            'config_path' => $configPath
         ]);
 
-        Session::flash('success', 'Module updated successfully.');
+        Session::flash('success', 'Module updated successfully with Supabase Storage.');
         redirect('/admin/vault');
     }
 

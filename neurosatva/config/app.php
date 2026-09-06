@@ -9,5 +9,8 @@ return [
     'admin_notification_email' => env('ADMIN_NOTIFICATION_EMAIL', 'contactus@raaksapphire.com'),
     'resend_api_key' => env('RESEND_API_KEY', 're_UjxVfKnT_6iykNtVsJJhzDXr1eGRDRPCE'),
     'resend_from_email' => env('RESEND_FROM_EMAIL', 'Neurosatva <onboarding@resend.dev>'),
-    'storage_disk' => env('STORAGE_DISK', 'server'),
+    'storage_disk' => env('STORAGE_DISK', 'supabase'),
+    'supabase_url' => env('SUPABASE_URL', 'https://qdzjlqyzppwkcjlvkbnr.supabase.co'),
+    'supabase_key' => env('SUPABASE_KEY', 'sb_publishable_41mduo6brjTVTCyupvPEGA_Lbkbbagd'),
+    'supabase_bucket' => env('SUPABASE_BUCKET', 'modules'),
 ];
