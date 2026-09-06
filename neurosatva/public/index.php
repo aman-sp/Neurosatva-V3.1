@@ -93,7 +93,16 @@ try {
     $router->dispatch(request_method(), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/');
 } catch (PDOException $exception) {
     http_response_code(500);
-    view('errors/database', ['title' => 'Database Setup Required'], 'auth');
+    if (app_config('debug')) {
+        exit('Database connection error: ' . e($exception->getMessage()));
+    }
+    view('errors/database', [
+        'title' => 'Database Setup Required',
+        'dbError' => $exception->getMessage(),
+        'dbHost' => env('DB_HOST', '127.0.0.1'),
+        'dbName' => env('DB_NAME', 'neurosatva'),
+        'dbUser' => env('DB_USER', 'root'),
+    ], 'auth');
 } catch (Throwable $exception) {
     http_response_code(500);
     if (app_config('debug')) {

@@ -1,17 +1,17 @@
 <h2>MySQL connection needs configuration</h2>
 <p class="muted">
-    Neurosatva could not connect to MySQL. Update the database details in the project
-    <strong>.env</strong> file, then refresh this page.
+    Neurosatva could not connect to MySQL. Verify the database credentials in your environment variables or <strong>.env</strong> file.
 </p>
 
 <div class="callout">
-    Database name: <strong>neurosatva</strong><br>
-    Config file: <strong>C:\xampp\htdocs\neurosatva\.env</strong><br>
-    Default XAMPP user: <strong>DB_USER=root</strong><br>
-    Default XAMPP password: <strong>DB_PASS=</strong>
+    Database Host: <strong><?= e($dbHost ?? '127.0.0.1') ?></strong><br>
+    Database Name: <strong><?= e($dbName ?? 'neurosatva') ?></strong><br>
+    Database User: <strong><?= e($dbUser ?? 'root') ?></strong>
+    <?php if (!empty($dbError)): ?>
+        <br><br><span style="color: #ef4444;">Error details: <?= e($dbError) ?></span>
+    <?php endif; ?>
 </div>
 
 <p class="muted">
-    If you have not created the database yet, import <strong>database/schema.sql</strong>, then
-    <strong>database/seed.sql</strong>.
+    Ensure your MySQL database server is running and accessible from this host.
 </p>
