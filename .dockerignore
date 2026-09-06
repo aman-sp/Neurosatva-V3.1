@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+neurosatva/.env
+*.sql
+*.md
+api/
+vercel.json
+neurosatva/vercel.json
+neurosatva/api/
