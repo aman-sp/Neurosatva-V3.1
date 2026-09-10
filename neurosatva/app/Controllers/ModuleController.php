@@ -163,15 +163,15 @@ final class ModuleController
             }
         }
 
-        $videoName = input('supabase_video_name') ?: $videoName;
-        $thumbnailName = input('supabase_thumbnail_name') ?: $thumbnailName;
-        $supabaseConfigUrl = input('supabase_config_url');
+        $videoName = input('r2_video_name') ?: (input('supabase_video_name') ?: $videoName);
+        $thumbnailName = input('r2_thumbnail_name') ?: (input('supabase_thumbnail_name') ?: $thumbnailName);
+        $remoteConfigUrl = input('r2_config_url') ?: input('supabase_config_url');
 
         // Save config.json
-        $configPath = $supabaseConfigUrl ?: ($dir . '/config.json');
+        $configPath = $remoteConfigUrl ?: ($dir . '/config.json');
         if ($configUploaded && file_exists($_FILES['config_json']['tmp_name'])) {
             @move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
-        } elseif (!$supabaseConfigUrl) {
+        } elseif (!$remoteConfigUrl) {
             $configJson = $this->generateConfig($name, $videoName ?? '', $timeline);
             @file_put_contents($configPath, $configJson);
         }
@@ -186,7 +186,8 @@ final class ModuleController
             'created_by' => Auth::id()
         ]);
 
-        Session::flash('success', 'Module created successfully with Supabase Storage.');
+        $storageProvider = input('r2_video_name') ? 'Cloudflare R2' : (input('supabase_video_name') ? 'Supabase' : 'Server');
+        Session::flash('success', "Module created successfully with {$storageProvider} Storage.");
         redirect('/admin/vault');
     }
 
@@ -331,14 +332,14 @@ final class ModuleController
         }
 
         $name = trim(input('name') ?? $module['name']);
-        $videoName = input('supabase_video_name') ?: $videoName;
-        $thumbnailName = input('supabase_thumbnail_name') ?: $thumbnailName;
-        $supabaseConfigUrl = input('supabase_config_url');
+        $videoName = input('r2_video_name') ?: (input('supabase_video_name') ?: $videoName);
+        $thumbnailName = input('r2_thumbnail_name') ?: (input('supabase_thumbnail_name') ?: $thumbnailName);
+        $remoteConfigUrl = input('r2_config_url') ?: input('supabase_config_url');
 
-        $configPath = $supabaseConfigUrl ?: ($module['config_path'] ?: ($dir . '/config.json'));
+        $configPath = $remoteConfigUrl ?: ($module['config_path'] ?: ($dir . '/config.json'));
         if ($configUploaded && file_exists($_FILES['config_json']['tmp_name'])) {
             @move_uploaded_file($_FILES['config_json']['tmp_name'], $configPath);
-        } elseif (!$supabaseConfigUrl) {
+        } elseif (!$remoteConfigUrl) {
             $configJson = $this->generateConfig($name, $videoName ?? '', $timeline);
             @file_put_contents($configPath, $configJson);
         }
@@ -351,7 +352,8 @@ final class ModuleController
             'config_path' => $configPath
         ]);
 
-        Session::flash('success', 'Module updated successfully with Supabase Storage.');
+        $storageProvider = input('r2_video_name') ? 'Cloudflare R2' : (input('supabase_video_name') ? 'Supabase' : 'Server');
+        Session::flash('success', "Module updated successfully with {$storageProvider} Storage.");
         redirect('/admin/vault');
     }
 

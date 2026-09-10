@@ -782,6 +782,78 @@ function initTestModal() {
   }
 }
 
+function uploadFileToR2(file, folderName, filename, onProgress) {
+  const config = window.STORAGE_CONFIG;
+  if (!config || !config.r2_configured || !config.presign_url) {
+    return Promise.reject(new Error('Cloudflare R2 is not configured on the server.'));
+  }
+
+  const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  return new Promise((resolve, reject) => {
+    // Step 1: Request presigned PUT URL from backend
+    const xhrPresign = new XMLHttpRequest();
+    xhrPresign.open('POST', config.presign_url, true);
+    xhrPresign.setRequestHeader('Content-Type', 'application/json');
+
+    xhrPresign.onload = () => {
+      if (xhrPresign.status < 200 || xhrPresign.status >= 300) {
+        let errMsg = 'Failed to obtain Cloudflare R2 upload signature.';
+        try {
+          const res = JSON.parse(xhrPresign.responseText);
+          if (res.error) errMsg = res.error;
+        } catch (_) {}
+        return reject(new Error(errMsg));
+      }
+
+      let data;
+      try {
+        data = JSON.parse(xhrPresign.responseText);
+      } catch (e) {
+        return reject(new Error('Invalid signature response from server.'));
+      }
+
+      if (!data.upload_url) {
+        return reject(new Error(data.error || 'No upload URL received from server.'));
+      }
+
+      // Step 2: Stream binary file directly to Cloudflare R2
+      const xhrUpload = new XMLHttpRequest();
+      xhrUpload.open('PUT', data.upload_url, true);
+
+      if (file.type) {
+        xhrUpload.setRequestHeader('Content-Type', file.type);
+      }
+
+      if (xhrUpload.upload && onProgress) {
+        xhrUpload.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+      }
+
+      xhrUpload.onload = () => {
+        if (xhrUpload.status >= 200 && xhrUpload.status < 300) {
+          resolve({
+            name: data.filename || cleanFilename,
+            key: data.key,
+            url: data.public_url
+          });
+        } else {
+          reject(new Error(`Cloudflare R2 upload failed with status ${xhrUpload.status}. Check R2 bucket CORS settings.`));
+        }
+      };
+
+      xhrUpload.onerror = () => reject(new Error('Network error during Cloudflare R2 upload. Check bucket CORS settings.'));
+      xhrUpload.send(file);
+    };
+
+    xhrPresign.onerror = () => reject(new Error('Network error reaching upload presign endpoint.'));
+    xhrPresign.send(JSON.stringify({ folder: folderName, filename: cleanFilename }));
+  });
+}
+
 function uploadFileToSupabase(file, folderName, filename, onProgress) {
   const config = window.SUPABASE_CONFIG;
   if (!config || !config.url || !config.key) {
@@ -837,9 +909,12 @@ function initModuleFormSubmission() {
   form.addEventListener('submit', async function(e) {
     if (form.dataset.submitting === 'true') return;
 
-    const config = window.SUPABASE_CONFIG;
-    if (!config || !config.url || !config.key) {
-      return; // fallback to standard form submit
+    const storageConfig = window.STORAGE_CONFIG;
+    const isR2 = storageConfig && storageConfig.r2_configured;
+    const isSupabase = window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url && window.SUPABASE_CONFIG.key;
+
+    if (!isR2 && !isSupabase) {
+      return; // fallback to standard server form submit
     }
 
     const nameInput = form.querySelector('input[name="name"]');
@@ -856,7 +931,7 @@ function initModuleFormSubmission() {
     const audioFiles = audioInput && audioInput.files ? Array.from(audioInput.files) : [];
     const configFile = configInput && configInput.files && configInput.files[0];
 
-    // If there are files to upload, stream directly to Supabase to avoid Vercel 4.5MB payload limit
+    // If there are files to upload, stream directly to Cloudflare R2 or Supabase
     if (videoFile || thumbFile || audioFiles.length > 0 || configFile) {
       e.preventDefault();
 
@@ -870,64 +945,68 @@ function initModuleFormSubmission() {
         });
       };
 
+      const uploader = isR2 ? uploadFileToR2 : uploadFileToSupabase;
+      const targetName = isR2 ? 'Cloudflare R2' : 'Supabase';
+      const prefix = isR2 ? 'r2' : 'supabase';
+
       try {
         if (thumbFile) {
-          setStatus('Uploading Thumbnail to Supabase...');
+          setStatus(`Uploading Thumbnail to ${targetName}...`);
           const ext = thumbFile.name.split('.').pop().toLowerCase() || 'png';
-          const thumbRes = await uploadFileToSupabase(thumbFile, folderName, `thumbnail.${ext}`, (pct) => {
+          const thumbRes = await uploader(thumbFile, folderName, `thumbnail.${ext}`, (pct) => {
             setStatus(`Uploading Thumbnail: ${pct}%`);
           });
-          let hThumb = form.querySelector('input[name="supabase_thumbnail_name"]');
+          let hThumb = form.querySelector(`input[name="${prefix}_thumbnail_name"]`);
           if (!hThumb) {
             hThumb = document.createElement('input');
             hThumb.type = 'hidden';
-            hThumb.name = 'supabase_thumbnail_name';
+            hThumb.name = `${prefix}_thumbnail_name`;
             form.appendChild(hThumb);
           }
           hThumb.value = thumbRes.name;
-          thumbInput.value = ''; // Prevent binary multipart upload to Vercel
+          thumbInput.value = ''; // Prevent binary multipart upload to Railway
         }
 
         if (videoFile) {
-          setStatus('Uploading Master Video to Supabase...');
-          const videoRes = await uploadFileToSupabase(videoFile, folderName, videoFile.name, (pct) => {
+          setStatus(`Uploading Master Video to ${targetName}...`);
+          const videoRes = await uploader(videoFile, folderName, videoFile.name, (pct) => {
             setStatus(`Uploading Video: ${pct}%`);
           });
-          let hVideo = form.querySelector('input[name="supabase_video_name"]');
+          let hVideo = form.querySelector(`input[name="${prefix}_video_name"]`);
           if (!hVideo) {
             hVideo = document.createElement('input');
             hVideo.type = 'hidden';
-            hVideo.name = 'supabase_video_name';
+            hVideo.name = `${prefix}_video_name`;
             form.appendChild(hVideo);
           }
           hVideo.value = videoRes.name;
-          videoInput.value = ''; // Prevent binary multipart upload to Vercel
+          videoInput.value = ''; // Prevent binary multipart upload to Railway
         }
 
         if (audioFiles.length > 0) {
           for (let i = 0; i < audioFiles.length; i++) {
             const aFile = audioFiles[i];
             setStatus(`Uploading Audio (${i + 1}/${audioFiles.length}): ${aFile.name}...`);
-            const aRes = await uploadFileToSupabase(aFile, folderName, aFile.name, (pct) => {
+            const aRes = await uploader(aFile, folderName, aFile.name, (pct) => {
               setStatus(`Uploading Audio ${i + 1}/${audioFiles.length} (${pct}%)`);
             });
             const hAudio = document.createElement('input');
             hAudio.type = 'hidden';
-            hAudio.name = 'supabase_audio_names[]';
+            hAudio.name = `${prefix}_audio_names[]`;
             hAudio.value = aRes.name;
             form.appendChild(hAudio);
           }
-          audioInput.value = ''; // Prevent binary multipart upload to Vercel
+          audioInput.value = ''; // Prevent binary multipart upload to Railway
         }
 
         if (configFile) {
-          setStatus('Uploading Config JSON to Supabase...');
-          const configRes = await uploadFileToSupabase(configFile, folderName, 'config.json');
-          let hConfig = form.querySelector('input[name="supabase_config_url"]');
+          setStatus(`Uploading Config JSON to ${targetName}...`);
+          const configRes = await uploader(configFile, folderName, 'config.json');
+          let hConfig = form.querySelector(`input[name="${prefix}_config_url"]`);
           if (!hConfig) {
             hConfig = document.createElement('input');
             hConfig.type = 'hidden';
-            hConfig.name = 'supabase_config_url';
+            hConfig.name = `${prefix}_config_url`;
             form.appendChild(hConfig);
           }
           hConfig.value = configRes.url;
@@ -938,7 +1017,7 @@ function initModuleFormSubmission() {
         form.dataset.submitting = 'true';
         form.submit();
       } catch (err) {
-        alert('Supabase Upload Error: ' + err.message + '\n\nMake sure the "modules" bucket exists in your Supabase project with Public access.');
+        alert(`${targetName} Upload Error: ` + err.message + '\n\nPlease check your cloud storage settings and bucket CORS rules.');
         submitBtns.forEach(btn => {
           btn.disabled = false;
           btn.innerHTML = 'Save &amp; Publish Module';

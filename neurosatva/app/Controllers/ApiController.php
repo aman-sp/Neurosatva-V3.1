@@ -273,4 +273,62 @@ final class ApiController
         fclose($fp);
         exit;
     }
+
+    public function r2Presign(): void
+    {
+        if (Auth::role() !== 'admin') {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Forbidden. Admin access required.']);
+            exit;
+        }
+
+        if (!R2Client::isConfigured()) {
+            http_response_code(503);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Cloudflare R2 is not configured on this server.']);
+            exit;
+        }
+
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput ?: '', true);
+        if (!is_array($input)) {
+            $input = $_POST;
+        }
+
+        $folder = trim((string) ($input['folder'] ?? ''));
+        $filename = trim((string) ($input['filename'] ?? ''));
+
+        if ($folder === '' || $filename === '') {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Missing folder or filename.']);
+            exit;
+        }
+
+        // Sanitize folder and filename
+        $cleanFolder = preg_replace('/[^a-zA-Z0-9._-]/', '_', $folder);
+        $cleanFilename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+        $key = "{$cleanFolder}/{$cleanFilename}";
+
+        try {
+            $presignedUrl = R2Client::generatePresignedPutUrl($key, 3600);
+            $publicUrl = R2Client::getPublicUrl($key);
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'upload_url' => $presignedUrl,
+                'public_url' => $publicUrl,
+                'key' => $key,
+                'filename' => $cleanFilename
+            ]);
+            exit;
+        } catch (Throwable $e) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Failed to generate R2 upload URL: ' . $e->getMessage()]);
+            exit;
+        }
+    }
 }

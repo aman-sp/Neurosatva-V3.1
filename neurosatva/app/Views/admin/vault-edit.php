@@ -1,4 +1,9 @@
 <script>
+window.STORAGE_CONFIG = {
+    provider: "<?= e(app_config('storage_disk')) ?>",
+    r2_configured: <?= R2Client::isConfigured() ? 'true' : 'false' ?>,
+    presign_url: "<?= e(path('/api/r2/presign')) ?>"
+};
 window.SUPABASE_CONFIG = {
     url: "<?= e(app_config('supabase_url')) ?>",
     key: "<?= e(app_config('supabase_key')) ?>",

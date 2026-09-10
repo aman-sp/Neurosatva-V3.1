@@ -14,13 +14,13 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install -j$(nproc) gd pdo pdo_mysql zip opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure PHP for large file uploads (500MB)
+# Configure PHP runtime & safe memory limits
 RUN { \
-    echo 'upload_max_filesize = 500M'; \
-    echo 'post_max_size = 512M'; \
-    echo 'memory_limit = 512M'; \
-    echo 'max_execution_time = 600'; \
-    echo 'max_input_time = 600'; \
+    echo 'upload_max_filesize = 100M'; \
+    echo 'post_max_size = 128M'; \
+    echo 'memory_limit = 256M'; \
+    echo 'max_execution_time = 300'; \
+    echo 'max_input_time = 300'; \
     echo 'variables_order = "EGPCS"'; \
     echo 'display_errors = Off'; \
     echo 'log_errors = On'; \

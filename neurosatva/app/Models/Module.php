@@ -131,10 +131,10 @@ final class Module
             $data = json_decode($json, true);
             return is_array($data) ? $data : null;
         }
-        // Fallback to Supabase Storage config URL if file not on local disk
-        $supabaseUrl = self::getMediaUrl($module['folder_name'], 'config.json');
-        if ($supabaseUrl && str_starts_with($supabaseUrl, 'http')) {
-            $json = @file_get_contents($supabaseUrl);
+        // Fallback to R2 / Supabase Storage config URL if file not on local disk
+        $remoteConfigUrl = self::getMediaUrl($module['folder_name'], 'config.json');
+        if ($remoteConfigUrl && str_starts_with($remoteConfigUrl, 'http')) {
+            $json = @file_get_contents($remoteConfigUrl);
             $data = json_decode($json ?: '', true);
             return is_array($data) ? $data : null;
         }
@@ -149,11 +149,20 @@ final class Module
         if (str_starts_with($filename, 'http://') || str_starts_with($filename, 'https://')) {
             return $filename;
         }
+
+        // 1. Cloudflare R2 if configured
+        if (R2Client::isConfigured()) {
+            return R2Client::getPublicUrl("{$folderName}/{$filename}");
+        }
+
+        // 2. Supabase Storage if configured
         $supabaseUrl = rtrim((string) (app_config('supabase_url') ?? ''), '/');
         $bucket = app_config('supabase_bucket') ?: 'modules';
         if ($supabaseUrl !== '') {
             return "{$supabaseUrl}/storage/v1/object/public/{$bucket}/{$folderName}/" . rawurlencode($filename);
         }
+
+        // 3. Local server file streaming
         return path('/storage-serve/modules?folder=' . rawurlencode($folderName) . '&file=' . rawurlencode($filename));
     }
 
