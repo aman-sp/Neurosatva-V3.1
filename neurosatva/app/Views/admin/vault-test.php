@@ -171,12 +171,15 @@ document.addEventListener('DOMContentLoaded', async function() {
       const alive = await wledClient.ping();
       if (!alive) throw new Error('No valid WLED response received.');
     } catch (err) {
-      showPreflightError(
-        'Unable to connect to lighting controller at ' + ESP32_IP + '.\n' +
-        'Check network connectivity between this browser and the controller.\nDetails: ' + err.message
-      );
-      connDot.style.background = '#ef4444';
-      connText.textContent = 'Disconnected';
+      console.warn('Lighting controller unavailable during admin test. Continuing in demo mode.', err);
+      if (preflightSubtitle) {
+        preflightSubtitle.textContent = 'Lighting controller not detected. Continuing in demo mode.';
+      }
+      preflightStatus.textContent = '⚠ Lighting controller unavailable. Demo mode enabled. You can still start the test.';
+      connDot.style.background = '#f59e0b';
+      connText.textContent = 'Disconnected (demo mode)';
+      startBtn.style.display = 'inline-flex';
+      startBtn.dataset.configJson = JSON.stringify(configData);
       return;
     }
 

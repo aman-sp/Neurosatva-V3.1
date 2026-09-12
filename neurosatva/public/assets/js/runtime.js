@@ -768,11 +768,20 @@ class RuntimeController {
   }
 
   async init() {
-    if (!this.config._esp32_ip || !this.ipRegex.test(this.config._esp32_ip)) {
-      throw new Error("Invalid ESP32 IP address format.");
+    const esp32Ip = this.config._esp32_ip || '';
+    if (!esp32Ip || !this.ipRegex.test(esp32Ip)) {
+      console.warn('No valid ESP32 IP configured. Continuing in demo mode without lighting sync.');
+      this.wled = new WLEDClient(esp32Ip || '127.0.0.1');
+      this.hud = new StatusHUD(this.hudElement);
+      this.timeline = new TimelineEngine(this.config.timeline || []);
+      this.video = new VideoEngine(this.videoElement);
+      this.audio = new AudioEngine();
+      this.lighting = new LightingEngine(this.wled);
+      this.hud.update({ connectionStatus: 'disconnected', connectionText: 'Disconnected (demo mode)' });
+      return;
     }
 
-    this.wled = new WLEDClient(this.config._esp32_ip);
+    this.wled = new WLEDClient(esp32Ip);
     this.hud = new StatusHUD(this.hudElement);
     this.timeline = new TimelineEngine(this.config.timeline || []);
     this.video = new VideoEngine(this.videoElement);
@@ -783,8 +792,9 @@ class RuntimeController {
 
     const isAlive = await this.wled.ping();
     if (!isAlive) {
-      this.hud.update({ connectionStatus: 'disconnected', connectionText: 'Disconnected' });
-      throw new Error("Unable to connect to WLED device at " + this.config._esp32_ip);
+      console.warn('WLED device unreachable. Continuing in demo mode without lighting sync.');
+      this.hud.update({ connectionStatus: 'disconnected', connectionText: 'Disconnected (demo mode)' });
+      return;
     }
 
     this.hud.update({ connectionStatus: 'connected', connectionText: 'Connected' });
