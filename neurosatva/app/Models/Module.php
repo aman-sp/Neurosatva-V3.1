@@ -150,6 +150,11 @@ final class Module
             return $filename;
         }
 
+        $publicFilePath = dirname(__DIR__, 2) . '/public/modules/' . $folderName . '/' . basename($filename);
+        if (file_exists($publicFilePath)) {
+            return path('/modules/' . rawurlencode($folderName) . '/' . rawurlencode(basename($filename)));
+        }
+
         // 1. Cloudflare R2 if configured
         if (R2Client::isConfigured()) {
             return R2Client::getPublicUrl("{$folderName}/{$filename}");

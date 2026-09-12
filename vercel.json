@@ -11,6 +11,10 @@
       "dest": "/neurosatva/public/assets/$1"
     },
     {
+      "src": "/modules/(.*)",
+      "dest": "/neurosatva/public/modules/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
