@@ -83,6 +83,8 @@ $router->get('/api/modules', [ApiController::class, 'modules']);
 $router->get('/api/tutor/modules', [ApiController::class, 'tutorModules']);
 $router->get('/api/tutor/module', [ApiController::class, 'tutorModule']);
 $router->get('/api/admin/module', [ApiController::class, 'adminModule']);
+$router->get('/api/wled/info', [ApiController::class, 'wledInfo']);
+$router->post('/api/wled/state', [ApiController::class, 'wledState']);
 $router->post('/api/runtime/start', [ApiController::class, 'runtimeStart']);
 $router->post('/api/runtime/end', [ApiController::class, 'runtimeEnd']);
 $router->post('/api/modules/test', [ApiController::class, 'testModule']);

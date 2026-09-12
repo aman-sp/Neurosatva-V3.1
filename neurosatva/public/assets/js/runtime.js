@@ -13,34 +13,69 @@
  */
 
 class WLEDClient {
-  constructor(ipAddress) {
+  constructor(ipAddress, options = {}) {
     this.ip = ipAddress;
     this.baseUrl = `http://${this.ip}`;
+    this.proxyBaseUrl = options.proxyBaseUrl || '';
   }
 
   async _fetch(endpoint, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    
+
     try {
       const isHttps = window.location.protocol === 'https:';
-      if (isHttps) {
+      if (isHttps && !this.proxyBaseUrl) {
         console.warn('WLEDClient: Page is HTTPS but communicating with HTTP ESP32. Mixed content issues may occur.');
       }
-      
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+
+      let fetchUrl = `${this.baseUrl}${endpoint}`;
+      let fetchOptions = {
         ...options,
         mode: 'cors',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        signal: controller.signal,
+      };
+
+      if (this.proxyBaseUrl) {
+        if (endpoint === '/json/info') {
+          fetchUrl = `${this.proxyBaseUrl}/info?ip=${encodeURIComponent(this.ip)}`;
+          fetchOptions = {
+            method: 'GET',
+            credentials: 'same-origin',
+            signal: controller.signal,
+          };
+        } else {
+          fetchUrl = `${this.proxyBaseUrl}/state`;
+          const bodyJson = options.body ? JSON.parse(options.body) : {};
+          fetchOptions = {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip: this.ip, state: bodyJson }),
+            signal: controller.signal,
+          };
+        }
       }
-      
-      return await response.json();
+
+      const response = await fetch(fetchUrl, fetchOptions);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (this.proxyBaseUrl) {
+        if (payload && payload.ok !== undefined && payload.data !== undefined) {
+          return payload.data;
+        }
+        if (payload && payload.ok !== undefined && payload.result !== undefined) {
+          return payload.result;
+        }
+      }
+
+      return payload;
     } catch (err) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
@@ -495,6 +530,11 @@ class AudioEngine {
 class VideoEngine {
   constructor(videoElement) {
     this.video = videoElement;
+    if (this.video) {
+      this.video.playsInline = true;
+      this.video.muted = true;
+      this.video.autoplay = true;
+    }
   }
 
   async load(url) {
@@ -502,6 +542,11 @@ class VideoEngine {
       if (!url) {
         resolve();
         return;
+      }
+      if (this.video) {
+        this.video.playsInline = true;
+        this.video.muted = true;
+        this.video.autoplay = true;
       }
       this.video.src = url;
 
@@ -695,6 +740,31 @@ class RuntimeController {
     this.pauseOffset = 0;
     this.isPaused = false;
     this.lastPauseTime = 0;
+    this.userSeeking = false;
+    this._mediaEventsBound = false;
+  }
+
+  _bindMediaEvents() {
+    if (!this.videoElement || this._mediaEventsBound) return;
+
+    this.videoElement.addEventListener('waiting', () => {
+      this.userSeeking = true;
+    });
+    this.videoElement.addEventListener('seeking', () => {
+      this.userSeeking = true;
+    });
+    this.videoElement.addEventListener('seeked', () => {
+      this.userSeeking = false;
+      if (Number.isFinite(this.videoElement.currentTime)) {
+        this.startTime = Date.now() - (this.videoElement.currentTime * 1000);
+        this.pauseOffset = 0;
+      }
+    });
+    this.videoElement.addEventListener('playing', () => {
+      this.userSeeking = false;
+    });
+
+    this._mediaEventsBound = true;
   }
 
   async init() {
@@ -739,19 +809,30 @@ class RuntimeController {
   }
 
   get currentTime() {
-    let t = this.videoElement ? this.videoElement.currentTime : 0;
+    if (!this.videoElement) return 0;
+    if (this.userSeeking) return Number.isFinite(this.videoElement.currentTime) ? this.videoElement.currentTime : 0;
+
+    let t = this.videoElement.currentTime;
     const fallbackTime = Math.max(0, (Date.now() - this.startTime - this.pauseOffset) / 1000);
-    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0) {
+    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0 && !this.videoElement.error) {
       t = fallbackTime;
     }
     return t;
   }
 
   async start() {
+    this._bindMediaEvents();
     this.startTime = Date.now();
     this.pauseOffset = 0;
     this.isPaused = false;
+    this.userSeeking = false;
     this.audio.initContext();
+
+    if (this.videoElement) {
+      this.videoElement.playsInline = true;
+      this.videoElement.muted = true;
+      this.videoElement.autoplay = true;
+    }
 
     try {
       await this.video.play();
@@ -759,6 +840,7 @@ class RuntimeController {
       console.warn("Primary video.play() failed, attempting muted fallback playback:", err);
       try {
         this.videoElement.muted = true;
+        this.videoElement.autoplay = true;
         await this.video.play();
       } catch (err2) {
         console.warn("Video playback unavailable on this browser/codec, running session audio & lighting clock:", err2);
@@ -781,7 +863,11 @@ class RuntimeController {
         scroller.addEventListener('input', (e) => {
           const val = parseFloat(e.target.value);
           if (this.video && !isNaN(val)) {
-            try { this.videoElement.currentTime = val; } catch (err) {}
+            this.userSeeking = true;
+            try {
+              this.videoElement.pause();
+              this.videoElement.currentTime = val;
+            } catch (err) {}
           }
         });
       }
@@ -818,9 +904,17 @@ class RuntimeController {
   _tick() {
     if (this.isPaused) return;
 
+    if (this.userSeeking) {
+      const scroller = document.getElementById('timeline-scroller');
+      if (scroller && Number.isFinite(this.videoElement.currentTime)) {
+        scroller.value = this.videoElement.currentTime;
+      }
+      return;
+    }
+
     let t = this.video.currentTime;
     const fallbackTime = Math.max(0, (Date.now() - this.startTime - this.pauseOffset) / 1000);
-    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0) {
+    if ((t <= 0.05 || isNaN(t)) && fallbackTime > 0 && !this.videoElement.error) {
       t = fallbackTime;
     }
 

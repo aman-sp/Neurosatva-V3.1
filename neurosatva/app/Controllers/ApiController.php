@@ -24,6 +24,51 @@ final class ApiController
         }
     }
 
+    private function requireAdminOrTutor(): void
+    {
+        if (!Auth::check() || !in_array(Auth::role(), ['admin', 'tutor'], true)) {
+            $this->json(['error' => 'Unauthorized'], 401);
+        }
+    }
+
+    private function fetchWledJson(string $ip, string $endpoint, ?array $payload = null): array
+    {
+        $url = 'http://' . $ip . $endpoint;
+
+        $context = null;
+        if ($payload !== null) {
+            $body = json_encode($payload);
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => "Content-Type: application/json\r\nAccept: application/json",
+                    'content' => $body,
+                    'timeout' => 5,
+                    'ignore_errors' => true,
+                ],
+            ]);
+        }
+
+        $response = $context !== null ? @file_get_contents($url, false, $context) : @file_get_contents($url, false, stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 5,
+                'ignore_errors' => true,
+            ],
+        ]));
+
+        if ($response === false) {
+            throw new RuntimeException('Unable to reach the WLED controller at ' . $ip . '.');
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('The WLED controller returned an invalid response.');
+        }
+
+        return $decoded;
+    }
+
     // GET /api/modules — admin only, returns all modules
     public function modules(): void
     {
@@ -98,6 +143,51 @@ final class ApiController
             }
         }
         $this->json($config);
+    }
+
+    public function wledInfo(): void
+    {
+        $this->requireAdminOrTutor();
+        $ip = trim((string) input('ip'));
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            $this->json(['error' => 'Invalid IP address format.'], 422);
+        }
+
+        try {
+            $payload = $this->fetchWledJson($ip, '/json/info');
+            $ok = !empty($payload['name']) || !empty($payload['ver']);
+            $this->json(['ok' => $ok, 'data' => $payload]);
+        } catch (Throwable $e) {
+            $this->json(['error' => $e->getMessage()], 502);
+        }
+    }
+
+    public function wledState(): void
+    {
+        $this->requireAdminOrTutor();
+
+        $rawInput = file_get_contents('php://input');
+        $payload = $rawInput !== false && trim($rawInput) !== '' ? json_decode($rawInput, true) : null;
+        if (!is_array($payload) || empty($payload['ip'])) {
+            $payload = [
+                'ip' => trim((string) ($_POST['ip'] ?? '')),
+                'state' => json_decode((string) ($_POST['state'] ?? '{}'), true),
+            ];
+        }
+
+        $ip = trim((string) ($payload['ip'] ?? ''));
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            $this->json(['error' => 'Invalid IP address format.'], 422);
+        }
+
+        $state = is_array($payload['state'] ?? null) ? $payload['state'] : [];
+
+        try {
+            $result = $this->fetchWledJson($ip, '/json/state', $state);
+            $this->json(['ok' => true, 'result' => $result]);
+        } catch (Throwable $e) {
+            $this->json(['error' => $e->getMessage()], 502);
+        }
     }
 
     // POST /api/runtime/start — tutor only, log session start

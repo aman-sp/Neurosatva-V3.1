@@ -119,6 +119,7 @@
 const MODULE_ID = <?= (int) $module['id'] ?>;
 const ESP32_IP = <?= json_encode($assignment['esp32_ip']) ?>;
 const MODULE_CONFIG_URL = <?= json_encode(path('/api/admin/module?id=' . (int) $module['id'] . '&ip=' . urlencode($assignment['esp32_ip']))) ?>;
+const WLED_PROXY_URL = <?= json_encode(path('/api/wled')) ?>;
 </script>
 <script src="<?= e(path('/assets/js/runtime.js?v=' . asset_version('assets/js/runtime.js'))) ?>"></script>
 <script>
@@ -165,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       preflightStatus.textContent = 'Connecting to lighting controller (' + ESP32_IP + ')...';
     }
 
-    const wledClient = new NeurosattvaRuntime.WLEDClient(ESP32_IP);
+    const wledClient = new NeurosattvaRuntime.WLEDClient(ESP32_IP, { proxyBaseUrl: WLED_PROXY_URL });
     try {
       const alive = await wledClient.ping();
       if (!alive) throw new Error('No valid WLED response received.');

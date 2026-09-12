@@ -102,6 +102,7 @@
 const ASSIGNMENT_ID = <?= (int) $assignment['id'] ?>;
 const ESP32_IP = <?= json_encode($assignment['esp32_ip']) ?>;
 const MODULE_CONFIG_URL = <?= json_encode(path('/api/tutor/module?id=' . (int) $assignment['id'])) ?>;
+const WLED_PROXY_URL = <?= json_encode(path('/api/wled')) ?>;
 const API_RUNTIME_START = <?= json_encode(path('/api/runtime/start')) ?>;
 const API_RUNTIME_END = <?= json_encode(path('/api/runtime/end')) ?>;
 </script>
@@ -156,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     preflightStatus.textContent = 'Connecting to classroom lighting controller (' + ESP32_IP + ')...';
 
     // Ping WLED
-    const wledClient = new NeurosattvaRuntime.WLEDClient(ESP32_IP);
+    const wledClient = new NeurosattvaRuntime.WLEDClient(ESP32_IP, { proxyBaseUrl: WLED_PROXY_URL });
     try {
       const alive = await wledClient.ping();
       if (!alive) throw new Error('No valid WLED response received.');
