@@ -2,10 +2,15 @@
   "version": 2,
   "functions": {
     "api/*.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.7.1",
+      "excludeFiles": "{neurosatva/public/modules/**/*.mp4,neurosatva/public/modules/**/*.mp3,storage/**,neurosatva/storage/**,*.sql,*.sql.*}"
     }
   },
   "routes": [
+    {
+      "src": "/api/ping.php",
+      "dest": "/api/ping.php"
+    },
     {
       "src": "/assets/(.*)",
       "dest": "/neurosatva/public/assets/$1"

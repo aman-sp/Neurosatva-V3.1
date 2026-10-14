@@ -2,13 +2,18 @@
   "version": 2,
   "functions": {
     "api/*.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.7.1",
+      "excludeFiles": "{public/modules/**/*.mp4,public/modules/**/*.mp3,storage/**,*.sql}"
     }
   },
   "routes": [
     {
       "src": "/assets/(.*)",
       "dest": "/public/assets/$1"
+    },
+    {
+      "src": "/modules/(.*)",
+      "dest": "/public/modules/$1"
     },
     {
       "src": "/(.*)",

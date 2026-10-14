@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/app/Core/Env.php';
 require dirname(__DIR__) . '/app/Core/helpers.php';
+
+if (app_config('debug')) {
+    ini_set('display_errors', '1');
+    error_reporting(E_ALL);
+}
+
 require dirname(__DIR__) . '/app/Core/Database.php';
 require dirname(__DIR__) . '/app/Core/Session.php';
 require dirname(__DIR__) . '/app/Core/Auth.php';
@@ -11,19 +17,14 @@ require dirname(__DIR__) . '/app/Core/Csrf.php';
 require dirname(__DIR__) . '/app/Core/Router.php';
 require dirname(__DIR__) . '/app/Core/R2Client.php';
 
-foreach (glob(dirname(__DIR__) . '/app/Models/*.php') as $file) {
-    require $file;
+foreach (glob(dirname(__DIR__) . '/app/Models/*.php') ?: [] as $file) {
+    require_once $file;
 }
-foreach (glob(dirname(__DIR__) . '/app/Controllers/*.php') as $file) {
-    require $file;
+foreach (glob(dirname(__DIR__) . '/app/Controllers/*.php') ?: [] as $file) {
+    require_once $file;
 }
 
 Session::start();
-
-if (app_config('debug')) {
-    ini_set('display_errors', '1');
-    error_reporting(E_ALL);
-}
 
 $router = new Router();
 
@@ -99,6 +100,7 @@ $router->get('/setup-database', [ApiController::class, 'setupDatabase']);
 try {
     $router->dispatch(request_method(), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/');
 } catch (PDOException $exception) {
+    error_log('Database connection error: ' . $exception->getMessage());
     http_response_code(500);
     if (app_config('debug')) {
         exit('Database connection error: ' . e($exception->getMessage()));
@@ -111,6 +113,7 @@ try {
         'dbUser' => env('DB_USER', 'root'),
     ], 'auth');
 } catch (Throwable $exception) {
+    error_log('Application error: ' . $exception->getMessage() . ' in ' . $exception->getFile() . ':' . $exception->getLine());
     http_response_code(500);
     if (app_config('debug')) {
         exit('Application error: ' . e($exception->getMessage()));
